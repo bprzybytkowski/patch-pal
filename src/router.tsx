@@ -3,6 +3,7 @@ import RootRedirect from './components/RootRedirect'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import AuthPage from './pages/Auth'
+import ResetPasswordPage from './pages/ResetPassword'
 import SessionsPage from './pages/Sessions'
 import NewSessionPage from './pages/NewSession'
 import SessionDetailPage from './pages/SessionDetail'
@@ -11,6 +12,7 @@ import DevicesPage from './pages/Devices'
 export const routes = [
   { path: '/', element: <RootRedirect /> },
   { path: '/auth', element: <AuthPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   {
     element: <ProtectedRoute />,
     children: [

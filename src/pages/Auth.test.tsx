@@ -8,6 +8,7 @@ vi.mock('../lib/supabase', () => ({
     auth: {
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
+      resetPasswordForEmail: vi.fn(),
     },
   },
 }))
@@ -78,6 +79,24 @@ describe('Auth page', () => {
     await userEvent.click(screen.getByRole('button', { name: /sign up/i }))
 
     expect(await screen.findByText(/already exists/i)).toBeInTheDocument()
+  })
+
+  it('clicking Forgot password shows reset form', async () => {
+    renderAuth()
+    await userEvent.click(screen.getByRole('button', { name: /forgot password/i }))
+    expect(screen.getByRole('button', { name: /send reset link/i })).toBeInTheDocument()
+  })
+
+  it('submitting forgot password form shows sent confirmation', async () => {
+    const { supabase } = await import('../lib/supabase')
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({ data: {}, error: null } as never)
+
+    renderAuth()
+    await userEvent.click(screen.getByRole('button', { name: /forgot password/i }))
+    await userEvent.type(screen.getByLabelText(/email/i), 'user@example.com')
+    await userEvent.click(screen.getByRole('button', { name: /send reset link/i }))
+
+    expect(await screen.findByText(/password reset link/i)).toBeInTheDocument()
   })
 
   it('sign-in failure shows inline error message', async () => {
