@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import DevicesPage from './Devices'
 
 vi.mock('../lib/supabase', () => ({ supabase: { from: vi.fn() } }))
+vi.mock('../store/auth', () => ({ useAuthStore: (sel: (s: { user: { id: string } }) => unknown) => sel({ user: { id: 'user-1' } }) }))
 
 interface Device {
   id: string

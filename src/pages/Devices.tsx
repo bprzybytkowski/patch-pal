@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuthStore } from '../store/auth'
 
 export type DeviceType =
   | 'pocket_operator'
@@ -184,6 +185,7 @@ function EditCard({
 }
 
 export default function DevicesPage() {
+  const user = useAuthStore((s) => s.user)
   const [devices, setDevices] = useState<Device[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -205,6 +207,7 @@ export default function DevicesPage() {
     const { data } = await supabase
       .from('devices')
       .insert({
+        user_id: user!.id,
         name: values.name.trim(),
         type: values.type,
         manufacturer: values.manufacturer.trim() || null,

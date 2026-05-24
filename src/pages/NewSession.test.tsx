@@ -9,6 +9,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>()
   return { ...actual, useNavigate: () => mockNavigate }
 })
+vi.mock('../store/auth', () => ({ useAuthStore: (sel: (s: { user: { id: string } }) => unknown) => sel({ user: { id: 'user-1' } }) }))
 
 const mockNavigate = vi.fn()
 const mockFrom = vi.mocked(supabase.from)

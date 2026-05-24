@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
+import { useAuthStore } from '../store/auth'
 import { DEVICE_TYPE_LABELS, DEVICE_TYPE_BADGE, type DeviceType, type Device } from './Devices'
 
 const MOOD_SUGGESTIONS = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi'] as const
@@ -31,6 +32,8 @@ export default function NewSessionPage() {
   const location = useLocation()
   const forkState = location.state as ForkState | null
 
+  const user = useAuthStore((s) => s.user)
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<MetaFields>({
     defaultValues: forkState?.prefill ?? { title: '', bpm: '', key_scale: '', ableton_project: '', notes: '' },
   })
@@ -56,6 +59,7 @@ export default function NewSessionPage() {
   const onSubmit = async (values: MetaFields) => {
     const bpm = values.bpm ? parseInt(values.bpm) : null
     const { data } = await supabase.from('sessions').insert({
+      user_id: user!.id,
       title: values.title.trim(),
       bpm,
       key_scale: values.key_scale.trim() || null,
