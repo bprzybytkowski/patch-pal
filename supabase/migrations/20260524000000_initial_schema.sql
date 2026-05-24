@@ -91,3 +91,9 @@ create policy "Own session_devices" on public.session_devices
     )
   );
 create index on public.session_devices(session_id);
+
+-- 5. Grant table-level access to authenticated users (RLS still restricts row access)
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.devices to authenticated;
+grant select, insert, update, delete on public.sessions to authenticated;
+grant select, insert, update, delete on public.session_devices to authenticated;
