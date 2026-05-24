@@ -51,7 +51,7 @@ export const DEVICE_TYPE_BADGE: Record<DeviceType, string> = {
   other: 'bg-zinc-800 text-zinc-400',
 }
 
-const DEVICE_ICONS: Record<DeviceType, LucideIcon> = {
+export const DEVICE_ICONS: Record<DeviceType, LucideIcon> = {
   pocket_operator: Cpu,
   analog_synth: Sliders,
   digital_synth: Zap,
