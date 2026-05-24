@@ -188,8 +188,9 @@ export default function DevicesPage() {
   const user = useAuthStore((s) => s.user)
   const [devices, setDevices] = useState<Device[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [addError, setAddError] = useState('')
 
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     defaultValues: { name: '', type: 'pocket_operator', manufacturer: '', notes: '' },
   })
 
@@ -204,7 +205,8 @@ export default function DevicesPage() {
   }, [])
 
   const handleAdd = handleSubmit(async (values) => {
-    const { data } = await supabase
+    setAddError('')
+    const { data, error } = await supabase
       .from('devices')
       .insert({
         user_id: user!.id,
@@ -214,6 +216,7 @@ export default function DevicesPage() {
         notes: values.notes.trim() || null,
       })
       .select()
+    if (error) { setAddError(error.message); return }
     if (data) {
       setDevices((prev) => [...prev, ...(data as Device[])])
       reset()
@@ -254,8 +257,9 @@ export default function DevicesPage() {
           <input
             id="name"
             className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            {...register('name', { required: true })}
+            {...register('name', { required: 'Name is required' })}
           />
+          {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="type" className="text-xs text-zinc-400">Type</label>
@@ -286,6 +290,7 @@ export default function DevicesPage() {
             {...register('notes')}
           />
         </div>
+        {addError && <p className="text-xs text-red-400">{addError}</p>}
         <button
           type="submit"
           disabled={isSubmitting}
