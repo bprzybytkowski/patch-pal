@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
 import { DEVICE_TYPE_LABELS, DEVICE_TYPE_BADGE, type DeviceType } from './Devices'
 
+const MOOD_SUGGESTIONS = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi'] as const
+
 interface SessionDeviceRow {
   id: string
   device_id: string
@@ -42,6 +44,14 @@ export default function SessionDetailPage() {
   const [parentTitle, setParentTitle] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+
+  const addTag = (raw: string) => {
+    const tag = raw.trim().toLowerCase()
+    if (!tag || tags.includes(tag) || tags.length >= 10) return
+    setTags((prev) => [...prev, tag])
+  }
+  const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag))
 
   const { register, handleSubmit, reset } = useForm<EditFields>()
 
@@ -59,11 +69,11 @@ export default function SessionDetailPage() {
           if (s.forked_from) {
             supabase
               .from('sessions')
-              .select('*, session_devices(*, devices(*))')
+              .select('id, title')
               .eq('id', s.forked_from)
               .single()
               .then(({ data: parent }) => {
-                if (parent) setParentTitle((parent as Session).title)
+                if (parent) setParentTitle((parent as { title: string }).title)
               })
           }
         }
@@ -191,6 +201,29 @@ export default function SessionDetailPage() {
               rows={3}
               className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
               {...register('notes')}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-xs text-zinc-400">Mood tags</span>
+            <div className="flex flex-wrap gap-1">
+              {tags.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs px-2 py-0.5 rounded">
+                  {tag}
+                  <button type="button" aria-label={`remove ${tag}`} onClick={() => removeTag(tag)} className="text-zinc-500 hover:text-zinc-300">×</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {MOOD_SUGGESTIONS.filter((s) => !tags.includes(s)).map((s) => (
+                <button key={s} type="button" onClick={() => addTag(s)} className="text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-900 border border-zinc-700 px-2 py-0.5 rounded">{s}</button>
+              ))}
+            </div>
+            <input
+              placeholder="Add a custom tag"
+              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput); setTagInput('') } }}
             />
           </div>
           <div className="flex gap-3">

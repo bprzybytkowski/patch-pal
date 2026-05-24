@@ -81,24 +81,24 @@ describe('New session form', () => {
   it('typing and pressing Enter adds a mood tag pill; clicking × removes it', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
-    const tagInput = screen.getByPlaceholderText(/add a mood tag/i)
+    const tagInput = screen.getByPlaceholderText(/add a custom tag/i)
     await userEvent.type(tagInput, 'dark{Enter}')
     expect(screen.getByText('dark')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /remove dark/i }))
-    expect(screen.queryByText('dark')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove dark/i })).not.toBeInTheDocument()
   })
 
   it('tags are stored lowercase and trimmed', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
-    await userEvent.type(screen.getByPlaceholderText(/add a mood tag/i), '  DARK  {Enter}')
+    await userEvent.type(screen.getByPlaceholderText(/add a custom tag/i), '  DARK  {Enter}')
     expect(screen.getByText('dark')).toBeInTheDocument()
   })
 
   it('enforces maximum of 10 mood tags', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
-    const tagInput = screen.getByPlaceholderText(/add a mood tag/i)
+    const tagInput = screen.getByPlaceholderText(/add a custom tag/i)
     for (let i = 1; i <= 10; i++) {
       await userEvent.type(tagInput, `tag${i}{Enter}`)
     }

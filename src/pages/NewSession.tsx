@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
 import { DEVICE_TYPE_LABELS, DEVICE_TYPE_BADGE, type DeviceType, type Device } from './Devices'
 
+const MOOD_SUGGESTIONS = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi'] as const
+
 interface MetaFields {
   title: string
   bpm: string
@@ -155,8 +157,20 @@ export default function NewSessionPage() {
                 </span>
               ))}
             </div>
+            <div className="flex flex-wrap gap-1">
+              {MOOD_SUGGESTIONS.filter((s) => !tags.includes(s)).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => addTag(s)}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-900 border border-zinc-700 px-2 py-0.5 rounded"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
             <input
-              placeholder="Add a mood tag"
+              placeholder="Add a custom tag"
               className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
