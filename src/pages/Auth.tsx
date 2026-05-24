@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/auth'
 import { usePostHog } from '@posthog/react'
 
 type Tab = 'signin' | 'signup'
-type Fields = { email: string; password: string }
+type Fields = { email: string; password: string; confirmPassword: string }
 
 export default function AuthPage() {
   const [tab, setTab] = useState<Tab>('signin')
@@ -19,9 +19,10 @@ export default function AuthPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<Fields>()
+  } = useForm<Fields>({ shouldUnregister: true })
 
   const switchTab = (next: Tab) => {
     setTab(next)
@@ -39,8 +40,12 @@ export default function AuthPage() {
       posthog.capture('user_signed_in')
       navigate('/sessions')
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setServerError(error.message); return }
+      if (data.user?.identities?.length === 0) {
+        setServerError('An account with this email already exists.')
+        return
+      }
       posthog.capture('user_signed_up', { email })
       setSignedUp(true)
     }
@@ -124,6 +129,27 @@ export default function AuthPage() {
               <p className="text-xs text-zinc-500">Choose a strong password you'll remember — at least 8 characters.</p>
             )}
           </div>
+
+          {tab === 'signup' && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="confirmPassword" className="text-sm text-zinc-400">
+                Confirm password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                {...register('confirmPassword', {
+                  required: 'Please confirm your password',
+                  validate: (val) => val === watch('password') || 'Passwords do not match',
+                })}
+              />
+              {errors.confirmPassword && (
+                <p className="text-xs text-red-400">{errors.confirmPassword.message}</p>
+              )}
+            </div>
+          )}
 
           {serverError && (
             <p className="text-xs text-red-400">{serverError}</p>
