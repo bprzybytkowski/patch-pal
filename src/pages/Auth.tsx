@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
-import posthog from 'posthog-js'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
 
@@ -33,14 +32,12 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setServerError(error.message); return }
       setUser(data.user)
-      posthog.identify(data.user.id, { email: data.user.email })
       navigate('/sessions')
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setServerError(error.message); return }
       if (data.user) {
         setUser(data.user)
-        posthog.identify(data.user.id, { email: data.user.email })
         navigate('/sessions')
       }
     }

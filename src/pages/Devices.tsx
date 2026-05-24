@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import posthog from 'posthog-js'
 import {
   Box,
   Cpu,
@@ -214,7 +213,6 @@ export default function DevicesPage() {
       .select()
     if (data) {
       setDevices((prev) => [...prev, ...(data as Device[])])
-      posthog.capture('device_created', { device_type: values.type })
       reset()
     }
   })

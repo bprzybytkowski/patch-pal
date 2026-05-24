@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import DevicesPage from './Devices'
 
 vi.mock('../lib/supabase', () => ({ supabase: { from: vi.fn() } }))
-vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 
 interface Device {
   id: string

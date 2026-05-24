@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { RouterProvider } from 'react-router-dom'
-import posthog from 'posthog-js'
 import { supabase } from './lib/supabase'
 import { useAuthStore } from './store/auth'
 import { router } from './router'
@@ -13,7 +12,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user ?? null
       setUser(user)
-      if (!user) posthog.reset()
+
     })
     return () => subscription.unsubscribe()
   }, [setUser])
