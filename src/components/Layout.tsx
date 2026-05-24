@@ -1,12 +1,16 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
+import { usePostHog } from '@posthog/react'
 
 export default function Layout() {
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
+  const posthog = usePostHog()
 
   const handleLogout = async () => {
+    posthog.capture('user_logged_out')
+    posthog.reset()
     await supabase.auth.signOut()
     setUser(null)
     navigate('/auth')

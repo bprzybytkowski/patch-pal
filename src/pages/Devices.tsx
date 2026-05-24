@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
+import { usePostHog } from '@posthog/react'
 
 export type DeviceType =
   | 'pocket_operator'
@@ -186,6 +187,7 @@ function EditCard({
 
 export default function DevicesPage() {
   const user = useAuthStore((s) => s.user)
+  const posthog = usePostHog()
   const [devices, setDevices] = useState<Device[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [addError, setAddError] = useState('')
@@ -218,6 +220,7 @@ export default function DevicesPage() {
       .select()
     if (error) { setAddError(error.message); return }
     if (data) {
+      posthog.capture('device_added', { device_type: values.type })
       setDevices((prev) => [...prev, ...(data as Device[])])
       reset()
     }
@@ -235,6 +238,7 @@ export default function DevicesPage() {
       .eq('id', deviceId)
       .select()
     if (data) {
+      posthog.capture('device_updated', { device_id: deviceId, device_type: values.type })
       setDevices((prev) => prev.map((d) => (d.id === deviceId ? (data[0] as Device) : d)))
       setEditingId(null)
     }
@@ -242,6 +246,7 @@ export default function DevicesPage() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this device?')) return
+    posthog.capture('device_deleted', { device_id: id })
     await supabase.from('devices').delete().eq('id', id)
     setDevices((prev) => prev.filter((d) => d.id !== id))
   }

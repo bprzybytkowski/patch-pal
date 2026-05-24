@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
 import { DEVICE_TYPE_LABELS, DEVICE_TYPE_BADGE, type DeviceType, type Device } from './Devices'
+import { usePostHog } from '@posthog/react'
 
 const MOOD_SUGGESTIONS = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi'] as const
 
@@ -33,6 +34,7 @@ export default function NewSessionPage() {
   const forkState = location.state as ForkState | null
 
   const user = useAuthStore((s) => s.user)
+  const posthog = usePostHog()
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<MetaFields>({
     defaultValues: forkState?.prefill ?? { title: '', bpm: '', key_scale: '', ableton_project: '', notes: '' },
@@ -81,6 +83,14 @@ export default function NewSessionPage() {
         }))
       )
     }
+    posthog.capture('session_created', {
+      session_id: data[0].id,
+      has_bpm: bpm !== null,
+      has_key_scale: !!values.key_scale.trim(),
+      device_count: sessionDevices.length,
+      tag_count: tags.length,
+      is_fork: !!forkState?.forkedFrom,
+    })
     navigate('/sessions')
   }
 

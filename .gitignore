@@ -24,3 +24,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.env
+
+# Setup reports
+posthog-setup-report.md

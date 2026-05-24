@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
+import { usePostHog } from '@posthog/react'
 
 type Tab = 'signin' | 'signup'
 type Fields = { email: string; password: string }
@@ -13,6 +14,7 @@ export default function AuthPage() {
   const [signedUp, setSignedUp] = useState(false)
   const navigate = useNavigate()
   const setUser = useAuthStore((s) => s.setUser)
+  const posthog = usePostHog()
 
   const {
     register,
@@ -33,10 +35,13 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setServerError(error.message); return }
       setUser(data.user)
+      posthog.identify(data.user.id, { email: data.user.email })
+      posthog.capture('user_signed_in')
       navigate('/sessions')
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) { setServerError(error.message); return }
+      posthog.capture('user_signed_up', { email })
       setSignedUp(true)
     }
   }

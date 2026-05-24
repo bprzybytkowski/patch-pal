@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
 import { DEVICE_TYPE_LABELS, DEVICE_TYPE_BADGE, type DeviceType } from './Devices'
+import { usePostHog } from '@posthog/react'
 
 const MOOD_SUGGESTIONS = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi'] as const
 
@@ -40,6 +41,7 @@ interface EditFields {
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const posthog = usePostHog()
   const [session, setSession] = useState<Session | null>(null)
   const [parentTitle, setParentTitle] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
@@ -112,6 +114,7 @@ export default function SessionDetailPage() {
       .eq('id', id)
       .select()
     if (data?.[0]) {
+      posthog.capture('session_updated', { session_id: id })
       setSession((prev) => prev ? { ...prev, ...data[0] } : prev)
       setEditing(false)
     }
@@ -119,12 +122,14 @@ export default function SessionDetailPage() {
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this session?')) return
+    posthog.capture('session_deleted', { session_id: id })
     await supabase.from('sessions').delete().eq('id', id)
     navigate('/sessions')
   }
 
   const handleFork = () => {
     if (!session) return
+    posthog.capture('session_forked', { source_session_id: session.id })
     navigate('/sessions/new', {
       state: {
         forkedFrom: session.id,
