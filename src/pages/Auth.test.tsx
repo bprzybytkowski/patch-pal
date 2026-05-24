@@ -34,6 +34,23 @@ describe('Auth page', () => {
     expect(screen.getByRole('button', { name: /sign up/i })).toBeInTheDocument()
   })
 
+  it('successful sign-up shows email confirmation message', async () => {
+    const { supabase } = await import('../lib/supabase')
+    vi.mocked(supabase.auth.signUp).mockResolvedValue({
+      data: { user: null, session: null },
+      error: null,
+    } as never)
+
+    renderAuth()
+    await userEvent.click(screen.getByRole('tab', { name: /sign up/i }))
+    await userEvent.type(screen.getByLabelText(/email/i), 'new@example.com')
+    await userEvent.type(screen.getByLabelText(/password/i), 'securepass')
+    await userEvent.click(screen.getByRole('button', { name: /sign up/i }))
+
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument()
+    expect(screen.getByText(/confirmation link/i)).toBeInTheDocument()
+  })
+
   it('sign-in failure shows inline error message', async () => {
     const { supabase } = await import('../lib/supabase')
     vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({

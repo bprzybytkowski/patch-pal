@@ -10,6 +10,7 @@ type Fields = { email: string; password: string }
 export default function AuthPage() {
   const [tab, setTab] = useState<Tab>('signin')
   const [serverError, setServerError] = useState('')
+  const [signedUp, setSignedUp] = useState(false)
   const navigate = useNavigate()
   const setUser = useAuthStore((s) => s.setUser)
 
@@ -34,13 +35,21 @@ export default function AuthPage() {
       setUser(data.user)
       navigate('/sessions')
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password })
+      const { error } = await supabase.auth.signUp({ email, password })
       if (error) { setServerError(error.message); return }
-      if (data.user) {
-        setUser(data.user)
-        navigate('/sessions')
-      }
+      setSignedUp(true)
     }
+  }
+
+  if (signedUp) {
+    return (
+      <div data-testid="auth-page" className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-8 w-full max-w-sm flex flex-col gap-3">
+          <h1 className="text-zinc-100 text-lg font-medium">Check your email</h1>
+          <p className="text-zinc-400 text-sm">We sent a confirmation link to your inbox. Click it to activate your account and sign in.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -105,6 +114,9 @@ export default function AuthPage() {
             />
             {errors.password && (
               <p className="text-xs text-red-400">{errors.password.message}</p>
+            )}
+            {tab === 'signup' && !errors.password && (
+              <p className="text-xs text-zinc-500">Choose a strong password you'll remember — at least 8 characters.</p>
             )}
           </div>
 
