@@ -41,7 +41,7 @@ export const DEVICE_TYPE_LABELS: Record<DeviceType, string> = {
   other: 'Other',
 }
 
-const DEVICE_TYPE_BADGE: Record<DeviceType, string> = {
+export const DEVICE_TYPE_BADGE: Record<DeviceType, string> = {
   pocket_operator: 'bg-indigo-900 text-indigo-300',
   analog_synth: 'bg-amber-900 text-amber-300',
   digital_synth: 'bg-cyan-900 text-cyan-300',
