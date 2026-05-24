@@ -58,11 +58,10 @@ export default function SessionsPage() {
     : sessions
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-        <span className="text-zinc-100 font-medium">PatchPal</span>
-        <div className="flex items-center gap-4">
-          <Link to="/devices" className="text-zinc-400 hover:text-zinc-100 text-sm">My gear</Link>
+    <div>
+      <div className="max-w-2xl mx-auto px-6 py-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-zinc-100 text-lg font-medium">Sessions</h1>
           <Link
             to="/sessions/new"
             className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
@@ -70,9 +69,6 @@ export default function SessionsPage() {
             New session
           </Link>
         </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-6 py-6 flex flex-col gap-4">
         <input
           placeholder="Search sessions…"
           className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"

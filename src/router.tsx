@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 import RootRedirect from './components/RootRedirect'
 import ProtectedRoute from './components/ProtectedRoute'
+import Layout from './components/Layout'
 import AuthPage from './pages/Auth'
 import SessionsPage from './pages/Sessions'
 import NewSessionPage from './pages/NewSession'
@@ -13,10 +14,15 @@ export const routes = [
   {
     element: <ProtectedRoute />,
     children: [
-      { path: '/sessions', element: <SessionsPage /> },
-      { path: '/sessions/new', element: <NewSessionPage /> },
-      { path: '/sessions/:id', element: <SessionDetailPage /> },
-      { path: '/devices', element: <DevicesPage /> },
+      {
+        element: <Layout />,
+        children: [
+          { path: '/sessions', element: <SessionsPage /> },
+          { path: '/sessions/new', element: <NewSessionPage /> },
+          { path: '/sessions/:id', element: <SessionDetailPage /> },
+          { path: '/devices', element: <DevicesPage /> },
+        ],
+      },
     ],
   },
 ]

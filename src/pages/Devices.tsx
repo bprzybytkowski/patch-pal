@@ -244,7 +244,7 @@ export default function DevicesPage() {
   }
 
   return (
-    <div data-testid="devices-page" className="min-h-screen bg-zinc-950 p-6 max-w-2xl mx-auto">
+    <div data-testid="devices-page" className="p-6 max-w-2xl mx-auto">
       <h1 className="text-zinc-100 text-lg font-medium mb-6">My gear</h1>
 
       <form onSubmit={handleAdd} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-6 flex flex-col gap-3">

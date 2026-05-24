@@ -149,7 +149,7 @@ export default function SessionDetailPage() {
   if (!session) return null
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6 max-w-2xl mx-auto flex flex-col gap-6">
+    <div className="p-6 max-w-2xl mx-auto flex flex-col gap-6">
       {session.forked_from && parentTitle && (
         <Link
           to={`/sessions/${session.forked_from}`}

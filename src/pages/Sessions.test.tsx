@@ -49,12 +49,11 @@ beforeEach(() => {
 })
 
 describe('Sessions list', () => {
-  it('renders PatchPal header with New session and My gear links', async () => {
+  it('renders Sessions heading and New session link', async () => {
     mockFrom.mockReturnValueOnce(makeSessionsFetch() as never)
     renderSessions()
-    expect(await screen.findByText('PatchPal')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /sessions/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /new session/i })).toHaveAttribute('href', '/sessions/new')
-    expect(screen.getByRole('link', { name: /my gear/i })).toHaveAttribute('href', '/devices')
   })
 
   it('clicking a session card links to the session detail', async () => {

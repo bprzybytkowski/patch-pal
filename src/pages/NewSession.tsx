@@ -85,7 +85,7 @@ export default function NewSessionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6 max-w-2xl mx-auto">
+    <div className="p-6 max-w-2xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
         <h1 className="text-zinc-100 text-lg font-medium">New session</h1>
 
