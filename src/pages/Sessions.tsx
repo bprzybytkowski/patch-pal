@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { DEVICE_TYPE_LABELS, DEVICE_TYPE_BADGE, DEVICE_ICONS, type DeviceType } from './Devices'
+import { DEVICE_TYPE_BADGE, DEVICE_ICONS, type DeviceType } from './Devices'
 
 interface SessionDeviceRow {
   id: string
