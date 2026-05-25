@@ -334,28 +334,45 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
           </div>
         ))}
 
-        {chainByGap['out'] && (
+        {chainByGap['out'] ? (
           <CableConnector conn={chainByGap['out']} theme={theme} />
+        ) : (
+          <div style={{ position: 'relative', height: 36, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+            <svg
+              viewBox="0 0 60 36"
+              style={{ position: 'absolute', left: 'calc(50% - 30px)', width: 60, height: 36 }}
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <line x1="30" y1="0" x2="30" y2="26" stroke={kindStyles.audio.stroke} strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M22 22 L30 32 L38 22" fill="none" stroke={kindStyles.audio.stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="30" cy="0" r="3" fill={kindStyles.audio.stroke} />
+            </svg>
+          </div>
         )}
 
-        <div
-          style={{
-            alignSelf: 'center',
-            border: `1.5px dashed ${T.ink}`,
-            color: T.ink,
-            background: 'transparent',
-            borderRadius: 24,
-            padding: '8px 22px',
-            fontFamily: '"JetBrains Mono", monospace',
-            fontSize: 11,
-            letterSpacing: '0.24em',
-            textTransform: 'uppercase',
-            fontWeight: 700,
-            marginTop: chainByGap['out'] ? 0 : 6,
-          }}
-        >
-          OUT ↗
-        </div>
+        {(() => {
+          const outConn = chainByGap['out']
+          const style = outConn ? kindStyles[outConn.kind] : kindStyles.audio
+          return (
+            <div
+              style={{
+                alignSelf: 'center',
+                border: `1px solid ${style.stroke}`,
+                color: style.labelColor,
+                background: style.labelBg,
+                borderRadius: 2,
+                padding: '4px 14px 3px',
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 9,
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+                fontWeight: 700,
+              }}
+            >
+              OUT
+            </div>
+          )
+        })()}
       </div>
 
       {bypass.length > 0 && (

@@ -740,14 +740,6 @@ export default function SessionDetailPage() {
                     theme={theme}
                     compact={isMobile}
                   />
-                  {(() => {
-                    const master = session.session_devices.find((sd) => sd.sync_role === 'master')
-                    return master ? (
-                      <div className="text-center font-serif italic text-[13px] text-ink-soft mt-1.5">
-                        {master.devices.name} clocks the rig; FX chain feeds the mixer.
-                      </div>
-                    ) : null
-                  })()}
                 </div>
               </div>
             )}
