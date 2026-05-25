@@ -38,3 +38,7 @@ create policy "Users delete own connections"
     exists (select 1 from public.sessions s
             where s.id = session_id and s.user_id = auth.uid())
   );
+
+grant select, insert, update, delete
+  on public.session_connections
+  to authenticated;
