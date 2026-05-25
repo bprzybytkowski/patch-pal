@@ -627,61 +627,27 @@ export default function SessionsPage() {
         </div>
       </div>
 
-      {/* Mobile: bottom tab bar */}
+      {/* FAB */}
       {isPhone && (
-        <>
-          <div style={{ height: 72 }} />
-          <nav
-            className="fixed bottom-2 inset-x-3 z-30 flex justify-around items-center py-1.5 px-2 rounded-[26px] backdrop-blur-md"
-            style={{
-              background: theme === 'dark' ? 'rgba(20,28,40,0.85)' : 'rgba(255,250,238,0.92)',
-              border: '1px solid rgb(var(--rule-soft))',
-              boxShadow: theme === 'dark' ? '0 4px 18px rgba(0,0,0,0.4)' : '0 4px 18px rgba(80,55,20,0.12)',
-            }}
-          >
-            <span className="flex-1 text-center font-mono text-[9px] tracking-[0.18em] uppercase font-bold text-accent py-1.5">
-              Sessions
-            </span>
-            <button
-              onClick={() => navigate('/devices')}
-              className="flex-1 text-center font-mono text-[9px] tracking-[0.18em] uppercase text-ink-muted py-1.5"
-            >
-              Gear
-            </button>
-            <button
-              onClick={async () => {
-                posthog.capture('user_logged_out')
-                posthog.reset()
-                await supabase.auth.signOut()
-                navigate('/auth')
-              }}
-              className="flex-1 text-center font-mono text-[9px] tracking-[0.18em] uppercase text-ink-muted py-1.5"
-            >
-              Me
-            </button>
-          </nav>
-
-          {/* FAB */}
-          <Link
-            to="/sessions/new"
-            className="fixed bottom-[72px] right-5 z-40 flex items-center justify-center"
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              background: 'rgb(var(--btn-bg))',
-              color: 'rgb(var(--btn-text))',
-              boxShadow: '3px 3px 0 rgb(var(--accent))',
-              fontFamily: '"Spectral", serif',
-              fontSize: 30,
-              fontWeight: 600,
-              lineHeight: 0.9,
-              textDecoration: 'none',
-            }}
-          >
-            ＋
-          </Link>
-        </>
+        <Link
+          to="/sessions/new"
+          className="fixed bottom-[72px] right-5 z-40 flex items-center justify-center"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            background: 'rgb(var(--btn-bg))',
+            color: 'rgb(var(--btn-text))',
+            boxShadow: '3px 3px 0 rgb(var(--accent))',
+            fontFamily: '"Spectral", serif',
+            fontSize: 30,
+            fontWeight: 600,
+            lineHeight: 0.9,
+            textDecoration: 'none',
+          }}
+        >
+          ＋
+        </Link>
       )}
     </div>
   )

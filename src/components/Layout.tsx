@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { usePostHog } from '@posthog/react'
+import { useMediaQuery } from '../lib/hooks'
 
 function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme } = useThemeStore()
@@ -83,6 +84,8 @@ export default function Layout() {
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
   const posthog = usePostHog()
+  const theme = useThemeStore((s) => s.theme)
+  const isPhone = useMediaQuery('(max-width: 640px)')
 
   const handleLogout = async () => {
     posthog.capture('user_logged_out')
@@ -148,7 +151,48 @@ export default function Layout() {
         <ThemeToggle compact />
       </div>
 
-      <Outlet />
+      <div className={isPhone ? 'pb-20' : ''}>
+        <Outlet />
+      </div>
+
+      {/* Mobile bottom tab bar */}
+      {isPhone && (
+        <nav
+          className="fixed bottom-2 inset-x-3 z-30 flex justify-around items-center py-1.5 px-2 rounded-[26px] backdrop-blur-md"
+          style={{
+            background: theme === 'dark' ? 'rgba(20,28,40,0.85)' : 'rgba(255,250,238,0.92)',
+            border: '1px solid rgb(var(--rule-soft))',
+            boxShadow: theme === 'dark' ? '0 4px 18px rgba(0,0,0,0.4)' : '0 4px 18px rgba(80,55,20,0.12)',
+          }}
+        >
+          <NavLink
+            to="/sessions"
+            className={({ isActive }) =>
+              `flex-1 text-center font-mono text-[9px] tracking-[0.18em] uppercase font-bold py-1.5 ${
+                isActive ? 'text-accent' : 'text-ink-muted'
+              }`
+            }
+          >
+            Sessions
+          </NavLink>
+          <NavLink
+            to="/devices"
+            className={({ isActive }) =>
+              `flex-1 text-center font-mono text-[9px] tracking-[0.18em] uppercase font-bold py-1.5 ${
+                isActive ? 'text-accent' : 'text-ink-muted'
+              }`
+            }
+          >
+            Gear
+          </NavLink>
+          <button
+            onClick={handleLogout}
+            className="flex-1 text-center font-mono text-[9px] tracking-[0.18em] uppercase font-bold py-1.5 text-ink-muted"
+          >
+            Log out
+          </button>
+        </nav>
+      )}
     </div>
   )
 }
