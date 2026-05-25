@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
-import { DEVICE_TYPE_LABELS, type DeviceType } from './Devices'
+import { DEVICE_TYPE_LABELS, type Device, type DeviceType } from './Devices'
 import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
 import { useMediaQuery } from '../lib/hooks'
@@ -59,6 +59,16 @@ interface EditFields {
   ableton_project: string
   notes: string
 }
+
+interface EditDevice {
+  deviceId: string
+  syncRole: string
+  syncMode: string
+  patchNotes: string
+  device: { id: string; name: string; type: DeviceType }
+}
+
+const SYNC_ROLES = ['master', 'slave', 'standalone'] as const
 
 function formatRelative(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -175,6 +185,8 @@ export default function SessionDetailPage() {
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [editConnections, setEditConnections] = useState<{ fromName: string; toName: string; kind: CableKind; label: string }[]>([])
+  const [editDevices, setEditDevices] = useState<EditDevice[]>([])
+  const [allDevices, setAllDevices] = useState<Device[]>([])
 
   const addTag = (raw: string) => {
     const tag = raw.trim().toLowerCase()
@@ -231,6 +243,18 @@ export default function SessionDetailPage() {
         label: c.label,
       })),
     )
+    setEditDevices(
+      session.session_devices.map((sd) => ({
+        deviceId: sd.device_id,
+        syncRole: sd.sync_role,
+        syncMode: sd.sync_mode ?? '',
+        patchNotes: sd.patch_notes ?? '',
+        device: sd.devices,
+      })),
+    )
+    supabase.from('devices').select('*').eq('user_id', user!.id).then(({ data }) => {
+      setAllDevices((data as Device[]) ?? [])
+    })
     setEditing(true)
   }
 
@@ -272,12 +296,35 @@ export default function SessionDetailPage() {
       await supabase.from('session_connections').insert(buildConnectionRows(id!))
     }
 
+    await supabase.from('session_devices').delete().eq('session_id', id)
+    if (editDevices.length > 0) {
+      await supabase.from('session_devices').insert(
+        editDevices.map((ed, i) => ({
+          session_id: id,
+          device_id: ed.deviceId,
+          sync_role: ed.syncRole,
+          sync_mode: ed.syncMode || null,
+          patch_notes: ed.patchNotes || null,
+          sort_order: i,
+        })),
+      )
+    }
+
     posthog.capture('session_updated', { session_id: id })
     setSession((prev) =>
       prev
         ? {
             ...prev,
             ...updatedFields,
+            session_devices: editDevices.map((ed, i) => ({
+              id: '',
+              device_id: ed.deviceId,
+              sync_role: ed.syncRole,
+              sync_mode: ed.syncMode || null,
+              patch_notes: ed.patchNotes || null,
+              sort_order: i,
+              devices: ed.device,
+            })),
             session_connections: editConnections.map((c, i) => ({
               id: '',
               session_id: id!,
@@ -312,14 +359,14 @@ export default function SessionDetailPage() {
     if (!newRows?.[0]) return
     const newId = newRows[0].id
 
-    if (session.session_devices.length > 0) {
+    if (editDevices.length > 0) {
       await supabase.from('session_devices').insert(
-        session.session_devices.map((sd, i) => ({
+        editDevices.map((ed, i) => ({
           session_id: newId,
-          device_id: sd.device_id,
-          sync_role: sd.sync_role,
-          sync_mode: sd.sync_mode,
-          patch_notes: sd.patch_notes,
+          device_id: ed.deviceId,
+          sync_role: ed.syncRole,
+          sync_mode: ed.syncMode || null,
+          patch_notes: ed.patchNotes || null,
           sort_order: i,
         })),
       )
@@ -531,9 +578,20 @@ export default function SessionDetailPage() {
               />
             </div>
 
-            {session.session_devices.length >= 2 && (
+            <EditDevicesSection
+              allDevices={allDevices}
+              editDevices={editDevices}
+              onAdd={(device) => setEditDevices((prev) => [
+                ...prev,
+                { deviceId: device.id, syncRole: 'standalone', syncMode: '', patchNotes: '', device: { id: device.id, name: device.name, type: device.type } },
+              ])}
+              onRemove={(idx) => setEditDevices((prev) => prev.filter((_, i) => i !== idx))}
+              onChange={(idx, patch) => setEditDevices((prev) => prev.map((ed, i) => i === idx ? { ...ed, ...patch } : ed))}
+            />
+
+            {editDevices.length >= 2 && (
               <EditConnectionsSection
-                deviceNames={session.session_devices.map((sd) => sd.devices.name)}
+                deviceNames={editDevices.map((ed) => ed.device.name)}
                 connections={editConnections}
                 onAdd={(c) => setEditConnections((prev) => [...prev, c])}
                 onRemove={(idx) => setEditConnections((prev) => prev.filter((_, i) => i !== idx))}
@@ -794,6 +852,203 @@ const CABLE_KIND_COLORS: Record<CableKind, string> = {
   audio: '#c13b2a',
   midi:  'rgb(var(--ink))',
   sync:  'rgb(var(--ink))',
+}
+
+function EditDeviceCard({
+  editDevice,
+  onChange,
+  onRemove,
+}: {
+  editDevice: EditDevice
+  onChange: (patch: Partial<Omit<EditDevice, 'deviceId' | 'device'>>) => void
+  onRemove: () => void
+}) {
+  return (
+    <div
+      className="relative flex flex-col gap-3 p-3 rounded-[2px]"
+      style={{
+        background: 'rgba(0,0,0,0.03)',
+        border: '1px solid rgb(var(--ink))',
+        boxShadow: '2px 2px 0 rgba(var(--ink)/0.1)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="Remove device"
+        className="absolute top-2.5 right-2.5 font-mono text-[14px] text-ink-muted hover:text-ink"
+        style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+      >
+        ×
+      </button>
+
+      <div className="pr-6">
+        <div className="font-serif font-semibold text-[15px] text-ink leading-tight">
+          {editDevice.device.name}
+        </div>
+        <div className="font-mono text-[9px] tracking-[0.16em] uppercase text-ink-muted mt-0.5">
+          {editDevice.device.type.replace(/_/g, ' ')}
+        </div>
+      </div>
+
+      <div className="flex gap-1.5">
+        {SYNC_ROLES.map((role) => (
+          <button
+            key={role}
+            type="button"
+            aria-pressed={editDevice.syncRole === role}
+            onClick={() => onChange({ syncRole: role })}
+            style={{
+              fontFamily: '"JetBrains Mono", monospace',
+              fontSize: 9,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              fontWeight: 700,
+              padding: '4px 8px 3px',
+              borderRadius: 2,
+              border: '1.5px solid',
+              cursor: 'pointer',
+              ...(editDevice.syncRole === role
+                ? { background: 'rgb(var(--ink))', color: 'rgb(var(--paper))', borderColor: 'rgb(var(--ink))' }
+                : { background: 'transparent', color: 'rgb(var(--ink-muted))', borderColor: 'rgb(var(--rule))' }),
+            }}
+          >
+            {role}
+          </button>
+        ))}
+      </div>
+
+      <input
+        placeholder="e.g. SY2, MIDI clock"
+        style={{
+          background: 'transparent',
+          border: 'none',
+          borderBottom: '1px dashed rgb(var(--ink-muted))',
+          padding: '4px 0',
+          fontFamily: '"Spectral", serif',
+          fontStyle: 'italic',
+          fontSize: 14,
+          color: 'rgb(var(--ink-soft))',
+          outline: 'none',
+        }}
+        value={editDevice.syncMode}
+        onChange={(e) => onChange({ syncMode: e.target.value })}
+      />
+
+      <textarea
+        rows={2}
+        placeholder="Patch notes, sounds, settings…"
+        style={{
+          background: 'transparent',
+          border: 'none',
+          borderBottom: '1px dashed rgb(var(--ink-muted))',
+          padding: '4px 0',
+          fontFamily: '"Spectral", serif',
+          fontStyle: 'italic',
+          fontSize: 14,
+          color: 'rgb(var(--ink-soft))',
+          outline: 'none',
+          resize: 'none',
+        }}
+        value={editDevice.patchNotes}
+        onChange={(e) => onChange({ patchNotes: e.target.value })}
+      />
+    </div>
+  )
+}
+
+function EditDevicesSection({
+  allDevices,
+  editDevices,
+  onAdd,
+  onRemove,
+  onChange,
+}: {
+  allDevices: Device[]
+  editDevices: EditDevice[]
+  onAdd: (device: Device) => void
+  onRemove: (idx: number) => void
+  onChange: (idx: number, patch: Partial<Omit<EditDevice, 'deviceId' | 'device'>>) => void
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickedIds = new Set(editDevices.map((ed) => ed.deviceId))
+  const available = allDevices.filter((d) => !pickedIds.has(d.id))
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2.5 font-mono text-[10px] tracking-[0.24em] uppercase text-ink-muted">
+        <span>Devices in this session</span>
+        <span className="flex-1 h-px bg-rule" />
+      </div>
+
+      {editDevices.map((ed, idx) => (
+        <EditDeviceCard
+          key={ed.deviceId}
+          editDevice={ed}
+          onChange={(patch) => onChange(idx, patch)}
+          onRemove={() => onRemove(idx)}
+        />
+      ))}
+
+      {!pickerOpen && (
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="font-serif italic text-[14px] text-ink-soft"
+          style={{
+            background: 'transparent',
+            border: '1px dashed rgb(var(--ink-muted))',
+            borderRadius: 2,
+            padding: '8px 16px',
+            cursor: 'pointer',
+            width: '100%',
+            textAlign: 'center',
+          }}
+        >
+          ＋ add device
+        </button>
+      )}
+
+      {pickerOpen && (
+        <div
+          className="flex flex-col gap-2 p-3 rounded-[2px]"
+          style={{ background: 'rgba(0,0,0,0.03)', border: '1px dashed rgb(var(--rule))' }}
+        >
+          {allDevices.length === 0 ? (
+            <p className="font-serif italic text-[14px] text-ink-soft">
+              No gear saved yet.{' '}
+              <Link to="/devices" className="text-accent underline">
+                Add your devices first →
+              </Link>
+            </p>
+          ) : available.length === 0 ? (
+            <p className="font-serif italic text-[14px] text-ink-soft">All your devices are already in this session.</p>
+          ) : (
+            <select
+              className="font-serif text-[14px] text-ink bg-transparent outline-none"
+              style={{ border: 'none', borderBottom: '1.5px solid rgb(var(--ink))', padding: '6px 0' }}
+              defaultValue=""
+              onChange={(e) => {
+                const device = allDevices.find((d) => d.id === e.target.value)
+                if (device) { onAdd(device); setPickerOpen(false) }
+              }}
+            >
+              <option value="" disabled>Select a device…</option>
+              {available.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={() => setPickerOpen(false)}
+            className="font-serif italic text-[13px] text-ink-muted self-start"
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            cancel
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function EditConnectionsSection({
