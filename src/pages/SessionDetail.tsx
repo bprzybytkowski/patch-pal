@@ -330,6 +330,7 @@ export default function SessionDetailPage() {
     }
 
     posthog.capture('session_created', { session_id: newId, is_fork: true })
+    setEditing(false)
     navigate(`/sessions/${newId}`)
   })
 
