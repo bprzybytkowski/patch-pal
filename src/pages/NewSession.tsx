@@ -189,38 +189,35 @@ export default function NewSessionPage() {
             )}
           </FieldInput>
 
-          {/* BPM + Key in 2-col grid */}
-          <div className="grid grid-cols-2 gap-5">
-            <FieldInput label="♩= BPM" id="bpm">
-              <input
-                id="bpm"
-                type="number"
-                style={{
-                  ...fieldStyle,
-                  fontSize: 42,
-                  fontWeight: 700,
-                  color: 'rgb(var(--accent))',
-                  letterSpacing: '-0.02em',
-                }}
-                {...register('bpm', {
-                  min: { value: 1, message: 'BPM must be between 1 and 399' },
-                  max: { value: 399, message: 'BPM must be between 1 and 399' },
-                })}
-              />
-              {errors.bpm && (
-                <p className="font-serif italic text-[14px] text-accent">{errors.bpm.message}</p>
-              )}
-            </FieldInput>
+          <FieldInput label="♩= BPM" id="bpm">
+            <input
+              id="bpm"
+              type="number"
+              style={{
+                ...fieldStyle,
+                fontSize: 42,
+                fontWeight: 700,
+                color: 'rgb(var(--accent))',
+                letterSpacing: '-0.02em',
+              }}
+              {...register('bpm', {
+                min: { value: 1, message: 'BPM must be between 1 and 399' },
+                max: { value: 399, message: 'BPM must be between 1 and 399' },
+              })}
+            />
+            {errors.bpm && (
+              <p className="font-serif italic text-[14px] text-accent">{errors.bpm.message}</p>
+            )}
+          </FieldInput>
 
-            <FieldInput label="Key / Scale" id="key_scale">
-              <input
-                id="key_scale"
-                placeholder="e.g. A minor"
-                style={fieldStyle}
-                {...register('key_scale')}
-              />
-            </FieldInput>
-          </div>
+          <FieldInput label="Key / Scale" id="key_scale">
+            <input
+              id="key_scale"
+              placeholder="e.g. A minor"
+              style={fieldStyle}
+              {...register('key_scale')}
+            />
+          </FieldInput>
 
           {/* Ableton project */}
           <FieldInput label="Ableton project" id="ableton_project">
