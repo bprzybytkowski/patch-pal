@@ -142,8 +142,8 @@ function SessionDetailPanel({
       <div
         style={{
           position: 'absolute',
-          top: 0,
-          right: 0,
+          top: 16,
+          right: 16,
           border: '2px solid rgb(var(--accent))',
           color: 'rgb(var(--accent))',
           padding: '4px 10px',
