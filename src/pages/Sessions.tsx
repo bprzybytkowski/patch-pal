@@ -80,12 +80,14 @@ function MoodSticker({ tag, theme }: { tag: string; theme: 'light' | 'dark' }) {
   )
 }
 
-function RoleStamp({ role }: { role: string }) {
+function RoleStamp({ role, theme }: { role: string; theme: 'light' | 'dark' }) {
   const colors =
     role === 'master'
       ? { c: 'rgb(var(--accent))', bg: 'rgb(var(--accent-soft))' }
       : role === 'slave'
-      ? { c: '#3a5a2a', bg: '#e6efd4' }
+      ? theme === 'dark'
+        ? { c: '#a7d188', bg: '#1f2c1a' }
+        : { c: '#3a5a2a', bg: '#e6efd4' }
       : { c: 'rgb(var(--ink-soft))', bg: 'rgb(var(--rule-soft))' }
 
   return (
@@ -279,7 +281,7 @@ function SessionDetailPanel({
                   </div>
                 )}
               </div>
-              <RoleStamp role={sd.sync_role} />
+              <RoleStamp role={sd.sync_role} theme={theme} />
             </div>
           ))}
         </div>
@@ -603,7 +605,7 @@ export default function SessionsPage() {
             <div
               className="m-8 rounded-[4px] p-[36px_38px_32px] overflow-hidden relative"
               style={{
-                background: 'linear-gradient(180deg, #fffaee 0%, #faf0d8 100%)',
+                background: 'var(--paper-grad)',
                 boxShadow: theme === 'dark'
                   ? '0 1px 0 rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.4), 0 30px 60px rgba(0,0,0,0.3)'
                   : '0 1px 0 rgba(40,30,10,0.05), 0 10px 24px rgba(80,55,20,0.12), 0 30px 60px rgba(80,55,20,0.08)',
