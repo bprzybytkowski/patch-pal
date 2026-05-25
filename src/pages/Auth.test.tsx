@@ -32,7 +32,7 @@ describe('Auth page', () => {
   it('switching to sign-up tab shows the sign-up form', async () => {
     renderAuth()
     await userEvent.click(screen.getByRole('tab', { name: /sign up/i }))
-    expect(screen.getByRole('button', { name: /sign up/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /start journaling/i })).toBeInTheDocument()
   })
 
   it('successful sign-up shows email confirmation message', async () => {
@@ -47,9 +47,9 @@ describe('Auth page', () => {
     await userEvent.type(screen.getByLabelText(/email/i), 'new@example.com')
     await userEvent.type(screen.getByLabelText('Password'), 'securepass')
     await userEvent.type(screen.getByLabelText('Confirm password'), 'securepass')
-    await userEvent.click(screen.getByRole('button', { name: /sign up/i }))
+    await userEvent.click(screen.getByRole('button', { name: /start journaling/i }))
 
-    expect(await screen.findByText(/check your email/i)).toBeInTheDocument()
+    expect(await screen.findByText(/check your inbox/i)).toBeInTheDocument()
     expect(screen.getByText(/confirmation link/i)).toBeInTheDocument()
   })
 
@@ -59,7 +59,7 @@ describe('Auth page', () => {
     await userEvent.type(screen.getByLabelText(/email/i), 'new@example.com')
     await userEvent.type(screen.getByLabelText('Password'), 'securepass')
     await userEvent.type(screen.getByLabelText('Confirm password'), 'different')
-    await userEvent.click(screen.getByRole('button', { name: /sign up/i }))
+    await userEvent.click(screen.getByRole('button', { name: /start journaling/i }))
 
     expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument()
   })
@@ -76,7 +76,7 @@ describe('Auth page', () => {
     await userEvent.type(screen.getByLabelText(/email/i), 'existing@example.com')
     await userEvent.type(screen.getByLabelText('Password'), 'securepass')
     await userEvent.type(screen.getByLabelText('Confirm password'), 'securepass')
-    await userEvent.click(screen.getByRole('button', { name: /sign up/i }))
+    await userEvent.click(screen.getByRole('button', { name: /start journaling/i }))
 
     expect(await screen.findByText(/already exists/i)).toBeInTheDocument()
   })

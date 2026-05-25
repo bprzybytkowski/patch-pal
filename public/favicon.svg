@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  
+  <rect x="6" y="8" width="52" height="48" rx="5" fill="#fffaee" stroke="#1a1814" stroke-width="2.5"></rect>
+  
+  <g transform="rotate(-3 32 12)">
+    <rect x="18" y="4" width="28" height="9" fill="#f4d35e" opacity="0.92" stroke="rgba(120,90,30,0.3)" stroke-width="0.5"></rect>
+  </g>
+  
+  <g fill="#c13b2a">
+    
+    <rect x="33.2" y="17" width="2.6" height="22.5"></rect>
+    
+    <path d="M35.8 17 Q 43 19, 44 26 Q 43 24, 35.8 24 Z"></path>
+    
+    <ellipse cx="28" cy="40" rx="6.4" ry="4.6" transform="rotate(-22 28 40)"></ellipse>
+  </g>
+  
+  <text x="32" y="52" text-anchor="middle" font-family="&#39;JetBrains Mono&#39;, ui-monospace, monospace" font-size="6.5" font-weight="700" fill="#8a6f45" letter-spacing="0.8">p / p</text>
+</svg>
