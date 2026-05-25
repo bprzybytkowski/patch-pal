@@ -503,6 +503,12 @@ export default function SessionsPage() {
             syncMode: sd.sync_mode ?? '',
             patchNotes: sd.patch_notes ?? '',
           })),
+          connections: (activeSession.session_connections ?? []).map((c) => ({
+            fromName: c.from_name,
+            toName: c.to_name,
+            kind: c.kind,
+            label: c.label,
+          })),
         },
       },
     })
