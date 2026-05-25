@@ -454,11 +454,17 @@ export default function SessionsPage() {
     if (!activeId) return
     supabase
       .from('sessions')
-      .select('*, session_devices(*, devices(*)), session_connections(*)')
+      .select('*, session_devices(*, devices(*))')
       .eq('id', activeId)
       .single()
-      .then(({ data }) => {
-        if (data) setActiveSession(data as Session)
+      .then(async ({ data }) => {
+        if (!data) return
+        const { data: connData } = await supabase
+          .from('session_connections')
+          .select('*')
+          .eq('session_id', activeId)
+          .order('sort_order')
+        setActiveSession({ ...(data as Session), session_connections: connData ?? [] })
       })
   }, [activeId])
 

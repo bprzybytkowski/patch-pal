@@ -24,6 +24,16 @@ function makeSessionFetch(session: unknown) {
   }
 }
 
+function makeConnectionsFetch(connections: unknown[] = []) {
+  return {
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({ data: connections, error: null }),
+      }),
+    }),
+  }
+}
+
 function makeUpdateMock(updated: unknown) {
   return {
     update: vi.fn().mockReturnValue({
@@ -79,7 +89,9 @@ beforeEach(() => {
 
 describe('Session detail', () => {
   it('fetches and displays the session title', async () => {
-    mockFrom.mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     expect(await screen.findByText('Late night jam')).toBeInTheDocument()
   })
@@ -89,6 +101,7 @@ describe('Session detail', () => {
     const child = makeSession({ forked_from: 'sess-0' })
     mockFrom
       .mockReturnValueOnce(makeSessionFetch(child) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
       .mockReturnValueOnce(makeSessionFetch(parent) as never)
     renderDetail()
     await screen.findByText('Late night jam')
@@ -100,6 +113,7 @@ describe('Session detail', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     mockFrom
       .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
       .mockReturnValueOnce(makeDeleteMock() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
@@ -108,11 +122,13 @@ describe('Session detail', () => {
 
   it('Delete with confirm=false does not delete', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false)
-    mockFrom.mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
     expect(mockNavigate).not.toHaveBeenCalled()
-    expect(mockFrom).toHaveBeenCalledTimes(1)
+    expect(mockFrom).toHaveBeenCalledTimes(2)
   })
 
   it('"Continue this take" navigates to /sessions/new with fork state', async () => {
@@ -124,7 +140,9 @@ describe('Session detail', () => {
         { id: 'sd-1', device_id: 'dev-1', sync_role: 'master', sync_mode: 'SY2', patch_notes: 'bass patch', sort_order: 0, devices: PO },
       ],
     })
-    mockFrom.mockReturnValueOnce(makeSessionFetch(session) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /continue this take/i }))
     expect(mockNavigate).toHaveBeenCalledWith('/sessions/new', {
@@ -142,7 +160,9 @@ describe('Session detail', () => {
   })
 
   it('Cancel discards changes and returns to view mode without saving', async () => {
-    mockFrom.mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
     await userEvent.clear(screen.getByRole('textbox', { name: /title/i }))
@@ -150,13 +170,14 @@ describe('Session detail', () => {
     await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
     expect(screen.getByText('Late night jam')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: /title/i })).not.toBeInTheDocument()
-    expect(mockFrom).toHaveBeenCalledTimes(1)
+    expect(mockFrom).toHaveBeenCalledTimes(2)
   })
 
   it('Save changes writes updated title to Supabase and returns to view mode', async () => {
     const updated = makeSession({ title: 'Renamed jam' })
     mockFrom
       .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
       .mockReturnValueOnce(makeUpdateMock(updated) as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
@@ -168,7 +189,9 @@ describe('Session detail', () => {
   })
 
   it('Edit button toggles title and notes to editable inputs', async () => {
-    mockFrom.mockReturnValueOnce(makeSessionFetch(makeSession({ notes: 'original notes' })) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(makeSession({ notes: 'original notes' })) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
     expect(screen.getByRole('textbox', { name: /title/i })).toHaveValue('Late night jam')
@@ -184,7 +207,9 @@ describe('Session detail', () => {
         { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sync_mode: 'SY2', patch_notes: 'bass patch', sort_order: 0, devices: PO },
       ],
     })
-    mockFrom.mockReturnValueOnce(makeSessionFetch(session) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     expect(await screen.findByText('120')).toBeInTheDocument()
     expect(screen.getByText('great session')).toBeInTheDocument()

@@ -23,9 +23,19 @@ function makeActiveSessionFetch(session: unknown = null) {
     select: vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
-          data: session ? { ...(session as object), session_connections: [] } : null,
+          data: session ? { ...(session as object) } : null,
           error: null,
         }),
+      }),
+    }),
+  }
+}
+
+function makeConnectionsFetch(connections: unknown[] = []) {
+  return {
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({ data: connections, error: null }),
       }),
     }),
   }
@@ -74,6 +84,7 @@ describe('Sessions list', () => {
     mockFrom
       .mockReturnValueOnce(makeSessionsFetch([session]) as never)
       .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderSessions()
     const card = await screen.findByRole('link', { name: /late night jam/i })
     expect(card).toHaveAttribute('href', '/sessions/sess-1')
@@ -84,6 +95,7 @@ describe('Sessions list', () => {
     mockFrom
       .mockReturnValueOnce(makeSessionsFetch([session]) as never)
       .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderSessions()
     await screen.findByText('Late night jam')
     await userEvent.type(screen.getByPlaceholderText(/search the ledger/i), 'zzznomatch')
@@ -98,6 +110,7 @@ describe('Sessions list', () => {
     mockFrom
       .mockReturnValueOnce(makeSessionsFetch(sessions) as never)
       .mockReturnValueOnce(makeActiveSessionFetch(sessions[0]) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderSessions()
     await screen.findByText('Late night jam')
 
@@ -120,6 +133,7 @@ describe('Sessions list', () => {
     mockFrom
       .mockReturnValueOnce(makeSessionsFetch([sessionWithDevice]) as never)
       .mockReturnValueOnce(makeActiveSessionFetch(sessionWithDevice) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderSessions()
     expect((await screen.findAllByText('PO-33')).length).toBeGreaterThan(0)
   })
@@ -129,6 +143,7 @@ describe('Sessions list', () => {
     mockFrom
       .mockReturnValueOnce(makeSessionsFetch([session]) as never)
       .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderSessions()
     expect(await screen.findByText('dark')).toBeInTheDocument()
     expect(screen.getByText('hypnotic')).toBeInTheDocument()
@@ -142,6 +157,7 @@ describe('Sessions list', () => {
     mockFrom
       .mockReturnValueOnce(makeSessionsFetch([session]) as never)
       .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderSessions()
     expect((await screen.findAllByText('120')).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/A minor/).length).toBeGreaterThan(0)
@@ -152,6 +168,7 @@ describe('Sessions list', () => {
     mockFrom
       .mockReturnValueOnce(makeSessionsFetch([session]) as never)
       .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderSessions()
     expect(await screen.findByText('Late night jam')).toBeInTheDocument()
     expect(screen.getByText('3d ago')).toBeInTheDocument()

@@ -181,24 +181,28 @@ export default function SessionDetailPage() {
   useEffect(() => {
     supabase
       .from('sessions')
-      .select('*, session_devices(*, devices(*)), session_connections(*)')
+      .select('*, session_devices(*, devices(*))')
       .eq('id', id)
       .single()
-      .then(({ data }) => {
-        if (data) {
-          const s = data as Session
-          setSession(s)
-          setTags(s.mood_tags)
-          if (s.forked_from) {
-            supabase
-              .from('sessions')
-              .select('id, title')
-              .eq('id', s.forked_from)
-              .single()
-              .then(({ data: parent }) => {
-                if (parent) setParentTitle((parent as { title: string }).title)
-              })
-          }
+      .then(async ({ data }) => {
+        if (!data) return
+        const { data: connData } = await supabase
+          .from('session_connections')
+          .select('*')
+          .eq('session_id', id)
+          .order('sort_order')
+        const s: Session = { ...(data as Session), session_connections: connData ?? [] }
+        setSession(s)
+        setTags(s.mood_tags)
+        if (s.forked_from) {
+          supabase
+            .from('sessions')
+            .select('id, title')
+            .eq('id', s.forked_from)
+            .single()
+            .then(({ data: parent }) => {
+              if (parent) setParentTitle((parent as { title: string }).title)
+            })
         }
       })
   }, [id])
