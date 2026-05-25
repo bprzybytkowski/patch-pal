@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { DndContext, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
 import { type Device } from './Devices'
@@ -294,6 +297,7 @@ export default function NewSessionPage() {
             onChange={(idx, patch) =>
               setSessionDevices((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)))
             }
+            onReorder={(from, to) => setSessionDevices((prev) => arrayMove(prev, from, to))}
           />
 
           {/* Connections (cables) section */}
@@ -584,16 +588,25 @@ function DevicesSection({
   onAdd,
   onRemove,
   onChange,
+  onReorder,
 }: {
   devices: Device[]
   sessionDevices: SessionDevice[]
   onAdd: (device: Device) => void
   onRemove: (idx: number) => void
   onChange: (idx: number, patch: Partial<SessionDevice>) => void
+  onReorder: (from: number, to: number) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickedIds = new Set(sessionDevices.map((d) => d.deviceId))
   const available = devices.filter((d) => !pickedIds.has(d.id))
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return
+    const from = sessionDevices.findIndex((sd) => sd.deviceId === active.id)
+    const to = sessionDevices.findIndex((sd) => sd.deviceId === over.id)
+    if (from !== -1 && to !== -1) onReorder(from, to)
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -604,19 +617,23 @@ function DevicesSection({
         <span className="flex-1 h-px bg-rule" />
       </div>
 
-      {sessionDevices.map((sd, idx) => {
-        const device = devices.find((d) => d.id === sd.deviceId)
-        if (!device) return null
-        return (
-          <DeviceCard
-            key={sd.deviceId}
-            device={device}
-            sessionDevice={sd}
-            onChange={(patch) => onChange(idx, patch)}
-            onRemove={() => onRemove(idx)}
-          />
-        )
-      })}
+      <DndContext onDragEnd={handleDragEnd}>
+        <SortableContext items={sessionDevices.map((sd) => sd.deviceId)} strategy={verticalListSortingStrategy}>
+          {sessionDevices.map((sd, idx) => {
+            const device = devices.find((d) => d.id === sd.deviceId)
+            if (!device) return null
+            return (
+              <DeviceCard
+                key={sd.deviceId}
+                device={device}
+                sessionDevice={sd}
+                onChange={(patch) => onChange(idx, patch)}
+                onRemove={() => onRemove(idx)}
+              />
+            )
+          })}
+        </SortableContext>
+      </DndContext>
 
       {!pickerOpen && (
         <button
@@ -689,6 +706,19 @@ function DevicesSection({
   )
 }
 
+function GripDots() {
+  return (
+    <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
+      <circle cx="2" cy="2" r="1.5" />
+      <circle cx="8" cy="2" r="1.5" />
+      <circle cx="2" cy="7" r="1.5" />
+      <circle cx="8" cy="7" r="1.5" />
+      <circle cx="2" cy="12" r="1.5" />
+      <circle cx="8" cy="12" r="1.5" />
+    </svg>
+  )
+}
+
 function DeviceCard({
   device,
   sessionDevice,
@@ -700,15 +730,31 @@ function DeviceCard({
   onChange: (patch: Partial<SessionDevice>) => void
   onRemove: () => void
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: sessionDevice.deviceId })
+
   return (
     <div
+      ref={setNodeRef}
       className="relative flex flex-col gap-3 p-3 rounded-[2px]"
       style={{
+        transform: CSS.Transform.toString(transform),
+        transition: transition ?? undefined,
         background: 'rgb(var(--card-active))',
         border: '1px solid rgb(var(--ink))',
         boxShadow: '2px 2px 0 rgba(var(--ink)/0.15)',
       }}
     >
+      <button
+        type="button"
+        {...listeners}
+        {...attributes}
+        aria-label="Drag to reorder"
+        className="absolute top-2.5 left-2"
+        style={{ background: 'none', border: 'none', cursor: 'grab', padding: '2px 4px', color: 'rgb(var(--ink-muted))' }}
+      >
+        <GripDots />
+      </button>
+
       <button
         type="button"
         onClick={onRemove}
@@ -719,7 +765,7 @@ function DeviceCard({
         ×
       </button>
 
-      <div className="pr-6">
+      <div className="px-6">
         <div className="font-serif font-semibold text-[15px] text-ink leading-tight">
           {device.name}
         </div>

@@ -58,11 +58,6 @@ const CABLE_KIND_STYLE = {
   },
 }
 
-function orderDevicesForFlow(devices: SignalFlowDevice[]): SignalFlowDevice[] {
-  const rank = (d: SignalFlowDevice) => (d.role === 'master' ? 0 : d.role === 'slave' ? 1 : 2)
-  return [...devices].sort((a, b) => rank(a) - rank(b))
-}
-
 function RoleStamp({ role, theme }: { role: string; theme: 'light' | 'dark' }) {
   const T = SF_THEME[theme]
   const r = role === 'master' ? T.roleMaster : role === 'slave' ? T.roleSlave : T.roleSolo
@@ -272,7 +267,7 @@ interface Props {
 
 export default function SignalFlow({ devices, connections, theme, compact = false }: Props) {
   const kindStyles = CABLE_KIND_STYLE[theme]
-  const ordered = orderDevicesForFlow(devices)
+  const ordered = [...devices]
   const orderIdx = (name: string) => ordered.findIndex((d) => d.name === name)
 
   const chainByGap: Record<string | number, SignalFlowConnection> = {}

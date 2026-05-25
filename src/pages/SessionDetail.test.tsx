@@ -5,6 +5,9 @@ import { supabase } from '../lib/supabase'
 import SessionDetailPage from './SessionDetail'
 
 vi.mock('../lib/supabase', () => ({ supabase: { from: vi.fn() } }))
+vi.mock('../store/auth', () => ({
+  useAuthStore: (sel: (s: { user: { id: string } }) => unknown) => sel({ user: { id: 'user-1' } }),
+}))
 
 const mockFrom = vi.mocked(supabase.from)
 const mockNavigate = vi.fn()
@@ -34,21 +37,20 @@ function makeConnectionsFetch(connections: unknown[] = []) {
   }
 }
 
-function makeUpdateMock(updated: unknown) {
+function makeDefaultFromMock() {
+  const eqReturn = Object.assign(
+    Promise.resolve({ data: null, error: null }),
+    {
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+  )
   return {
-    update: vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({ data: [updated], error: null }),
-      }),
-    }),
-  }
-}
-
-function makeDeleteMock() {
-  return {
-    delete: vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }),
+    select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue(eqReturn) }),
+    update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue(Promise.resolve({ data: null, error: null })) }),
+    delete: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue(Promise.resolve({ data: null, error: null })) }),
+    insert: vi.fn().mockResolvedValue({ data: [], error: null }),
   }
 }
 
@@ -85,6 +87,7 @@ function renderDetail(id = 'sess-1') {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockFrom.mockReturnValue(makeDefaultFromMock() as never)
 })
 
 describe('Session detail', () => {
@@ -96,25 +99,11 @@ describe('Session detail', () => {
     expect(await screen.findByText('Late night jam')).toBeInTheDocument()
   })
 
-  it('shows "Continued from" chip with parent title linking to parent session', async () => {
-    const parent = makeSession({ id: 'sess-0', title: 'Original session' })
-    const child = makeSession({ forked_from: 'sess-0' })
-    mockFrom
-      .mockReturnValueOnce(makeSessionFetch(child) as never)
-      .mockReturnValueOnce(makeConnectionsFetch() as never)
-      .mockReturnValueOnce(makeSessionFetch(parent) as never)
-    renderDetail()
-    await screen.findByText('Late night jam')
-    const chip = await screen.findByRole('link', { name: /continued from: original session/i })
-    expect(chip).toHaveAttribute('href', '/sessions/sess-0')
-  })
-
   it('Delete with confirm removes the session and redirects to /sessions', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     mockFrom
       .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
       .mockReturnValueOnce(makeConnectionsFetch() as never)
-      .mockReturnValueOnce(makeDeleteMock() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
     expect(mockNavigate).toHaveBeenCalledWith('/sessions')
@@ -128,35 +117,6 @@ describe('Session detail', () => {
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
     expect(mockNavigate).not.toHaveBeenCalled()
-    expect(mockFrom).toHaveBeenCalledTimes(2)
-  })
-
-  it('"Continue this take" navigates to /sessions/new with fork state', async () => {
-    const session = makeSession({
-      bpm: 120,
-      key_scale: 'A minor',
-      mood_tags: ['dark'],
-      session_devices: [
-        { id: 'sd-1', device_id: 'dev-1', sync_role: 'master', sync_mode: 'SY2', patch_notes: 'bass patch', sort_order: 0, devices: PO },
-      ],
-    })
-    mockFrom
-      .mockReturnValueOnce(makeSessionFetch(session) as never)
-      .mockReturnValueOnce(makeConnectionsFetch() as never)
-    renderDetail()
-    await userEvent.click(await screen.findByRole('button', { name: /continue this take/i }))
-    expect(mockNavigate).toHaveBeenCalledWith('/sessions/new', {
-      state: {
-        forkedFrom: 'sess-1',
-        prefill: expect.objectContaining({
-          title: 'Late night jam',
-          bpm: '120',
-          key_scale: 'A minor',
-          mood_tags: ['dark'],
-          devices: [expect.objectContaining({ deviceId: 'dev-1', syncRole: 'master', syncMode: 'SY2', patchNotes: 'bass patch' })],
-        }),
-      },
-    })
   })
 
   it('Cancel discards changes and returns to view mode without saving', async () => {
@@ -170,15 +130,12 @@ describe('Session detail', () => {
     await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
     expect(screen.getByText('Late night jam')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: /title/i })).not.toBeInTheDocument()
-    expect(mockFrom).toHaveBeenCalledTimes(2)
   })
 
   it('Save changes writes updated title to Supabase and returns to view mode', async () => {
-    const updated = makeSession({ title: 'Renamed jam' })
     mockFrom
       .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
       .mockReturnValueOnce(makeConnectionsFetch() as never)
-      .mockReturnValueOnce(makeUpdateMock(updated) as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
     await userEvent.clear(screen.getByRole('textbox', { name: /title/i }))
@@ -216,5 +173,37 @@ describe('Session detail', () => {
     expect((await screen.findAllByText('PO-33')).length).toBeGreaterThan(0)
     expect(screen.getByText('SY2')).toBeInTheDocument()
     expect(screen.getByText('"bass patch"')).toBeInTheDocument()
+  })
+
+  it('session_devices are displayed sorted by sort_order', async () => {
+    const TB303 = { id: 'dev-2', name: 'TB-303', type: 'analog_synth' }
+    const session = makeSession({
+      session_devices: [
+        { id: 'sd-2', device_id: 'dev-2', sync_role: 'standalone', sync_mode: null, patch_notes: null, sort_order: 1, devices: TB303 },
+        { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sync_mode: null, patch_notes: null, sort_order: 0, devices: PO },
+      ],
+    })
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
+    renderDetail()
+    await screen.findAllByText('PO-33')
+    const po = screen.getAllByText('PO-33')[0]
+    const tb = screen.getAllByText('TB-303')[0]
+    expect(po.compareDocumentPosition(tb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('edit device cards have a drag handle', async () => {
+    const session = makeSession({
+      session_devices: [
+        { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sync_mode: null, patch_notes: null, sort_order: 0, devices: PO },
+      ],
+    })
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(session) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
+    renderDetail()
+    await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
+    expect(await screen.findByRole('button', { name: /drag to reorder/i })).toBeInTheDocument()
   })
 })

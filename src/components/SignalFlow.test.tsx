@@ -13,6 +13,17 @@ const SAMPLE_CONNECTIONS: SignalFlowConnection[] = [
 ]
 
 describe('SignalFlow', () => {
+  it('renders devices in the order they are provided, not sorted by role', () => {
+    const devices: SignalFlowDevice[] = [
+      { name: 'Standalone First', role: 'standalone', type: 'sampler' },
+      { name: 'Master Second', role: 'master', type: 'digital_synth' },
+    ]
+    render(<SignalFlow devices={devices} connections={[]} theme="light" />)
+    const standalone = screen.getByText('Standalone First')
+    const master = screen.getByText('Master Second')
+    expect(standalone.compareDocumentPosition(master) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('renders OUT pill, master role stamp, and adjacent cable label', () => {
     render(
       <SignalFlow

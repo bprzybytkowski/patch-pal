@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { DndContext, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { DEVICE_TYPE_LABELS, type Device, type DeviceType } from './Devices'
 import { usePostHog } from '@posthog/react'
@@ -210,7 +213,12 @@ export default function SessionDetailPage() {
           .select('*')
           .eq('session_id', id)
           .order('sort_order')
-        const s: Session = { ...(data as Session), session_connections: connData ?? [] }
+        const raw = data as Session
+        const s: Session = {
+          ...raw,
+          session_devices: [...(raw.session_devices ?? [])].sort((a, b) => a.sort_order - b.sort_order),
+          session_connections: connData ?? [],
+        }
         setSession(s)
         setTags(s.mood_tags)
         setNextTakeId(null)
@@ -587,6 +595,7 @@ export default function SessionDetailPage() {
               ])}
               onRemove={(idx) => setEditDevices((prev) => prev.filter((_, i) => i !== idx))}
               onChange={(idx, patch) => setEditDevices((prev) => prev.map((ed, i) => i === idx ? { ...ed, ...patch } : ed))}
+              onReorder={(from, to) => setEditDevices((prev) => arrayMove(prev, from, to))}
             />
 
             {editDevices.length >= 2 && (
@@ -846,6 +855,19 @@ const CABLE_KIND_COLORS: Record<CableKind, string> = {
   sync:  'rgb(var(--ink))',
 }
 
+function GripDots() {
+  return (
+    <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
+      <circle cx="2" cy="2" r="1.5" />
+      <circle cx="8" cy="2" r="1.5" />
+      <circle cx="2" cy="7" r="1.5" />
+      <circle cx="8" cy="7" r="1.5" />
+      <circle cx="2" cy="12" r="1.5" />
+      <circle cx="8" cy="12" r="1.5" />
+    </svg>
+  )
+}
+
 function EditDeviceCard({
   editDevice,
   onChange,
@@ -855,15 +877,31 @@ function EditDeviceCard({
   onChange: (patch: Partial<Omit<EditDevice, 'deviceId' | 'device'>>) => void
   onRemove: () => void
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: editDevice.deviceId })
+
   return (
     <div
+      ref={setNodeRef}
       className="relative flex flex-col gap-3 p-3 rounded-[2px]"
       style={{
+        transform: CSS.Transform.toString(transform),
+        transition: transition ?? undefined,
         background: 'rgba(0,0,0,0.03)',
         border: '1px solid rgb(var(--ink))',
         boxShadow: '2px 2px 0 rgba(var(--ink)/0.1)',
       }}
     >
+      <button
+        type="button"
+        {...listeners}
+        {...attributes}
+        aria-label="Drag to reorder"
+        className="absolute top-2.5 left-2"
+        style={{ background: 'none', border: 'none', cursor: 'grab', padding: '2px 4px', color: 'rgb(var(--ink-muted))' }}
+      >
+        <GripDots />
+      </button>
+
       <button
         type="button"
         onClick={onRemove}
@@ -874,7 +912,7 @@ function EditDeviceCard({
         ×
       </button>
 
-      <div className="pr-6">
+      <div className="px-6">
         <div className="font-serif font-semibold text-[15px] text-ink leading-tight">
           {editDevice.device.name}
         </div>
@@ -955,16 +993,25 @@ function EditDevicesSection({
   onAdd,
   onRemove,
   onChange,
+  onReorder,
 }: {
   allDevices: Device[]
   editDevices: EditDevice[]
   onAdd: (device: Device) => void
   onRemove: (idx: number) => void
   onChange: (idx: number, patch: Partial<Omit<EditDevice, 'deviceId' | 'device'>>) => void
+  onReorder: (from: number, to: number) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickedIds = new Set(editDevices.map((ed) => ed.deviceId))
   const available = allDevices.filter((d) => !pickedIds.has(d.id))
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return
+    const from = editDevices.findIndex((ed) => ed.deviceId === active.id)
+    const to = editDevices.findIndex((ed) => ed.deviceId === over.id)
+    if (from !== -1 && to !== -1) onReorder(from, to)
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -973,14 +1020,18 @@ function EditDevicesSection({
         <span className="flex-1 h-px bg-rule" />
       </div>
 
-      {editDevices.map((ed, idx) => (
-        <EditDeviceCard
-          key={ed.deviceId}
-          editDevice={ed}
-          onChange={(patch) => onChange(idx, patch)}
-          onRemove={() => onRemove(idx)}
-        />
-      ))}
+      <DndContext onDragEnd={handleDragEnd}>
+        <SortableContext items={editDevices.map((ed) => ed.deviceId)} strategy={verticalListSortingStrategy}>
+          {editDevices.map((ed, idx) => (
+            <EditDeviceCard
+              key={ed.deviceId}
+              editDevice={ed}
+              onChange={(patch) => onChange(idx, patch)}
+              onRemove={() => onRemove(idx)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
 
       {!pickerOpen && (
         <button

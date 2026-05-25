@@ -186,6 +186,14 @@ describe('New session form', () => {
     expect(screen.getByDisplayValue('D minor')).toBeInTheDocument()
   })
 
+  it('device cards have a drag handle', async () => {
+    mockFrom.mockReturnValue(makeDevicesFetch([PO]) as never)
+    renderNewSession()
+    await userEvent.click(screen.getByRole('button', { name: /add device/i }))
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'dev-1')
+    expect(await screen.findByRole('button', { name: /drag to reorder/i })).toBeInTheDocument()
+  })
+
   it('pre-fills device cards from fork state', async () => {
     mockFrom.mockReturnValue(makeDevicesFetch([PO]) as never)
     const prefill = {
