@@ -838,8 +838,12 @@ function EditConnectionsSection({
 
   const toOptions = [...deviceNames, 'OUT']
 
+  const isDuplicate = connections.some(
+    (c) => c.fromName === draft.fromName && c.toName === draft.toName && c.kind === draft.kind
+  )
+
   const confirmAdd = () => {
-    if (!draft.fromName || !draft.toName) return
+    if (!draft.fromName || !draft.toName || isDuplicate) return
     onAdd({ ...draft, label: draft.label.trim() })
     setDraft({ fromName: deviceNames[0] ?? '', toName: deviceNames[1] ?? '', kind: 'audio', label: '' })
     setAdding(false)
@@ -980,7 +984,7 @@ function EditConnectionsSection({
             <button
               type="button"
               onClick={confirmAdd}
-              disabled={draft.fromName === draft.toName}
+              disabled={draft.fromName === draft.toName || isDuplicate}
               style={{
                 fontFamily: '"JetBrains Mono", monospace',
                 fontSize: 10,
@@ -993,11 +997,16 @@ function EditConnectionsSection({
                 background: 'rgb(var(--ink))',
                 color: 'rgb(var(--paper))',
                 cursor: 'pointer',
-                opacity: draft.fromName === draft.toName ? 0.4 : 1,
+                opacity: draft.fromName === draft.toName || isDuplicate ? 0.4 : 1,
               }}
             >
               Add cable
             </button>
+            {isDuplicate && (
+              <span className="font-mono text-[9px] tracking-[0.16em] uppercase text-ink-muted">
+                already connected
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setAdding(false)}
