@@ -6,21 +6,47 @@ import { usePostHog } from '@posthog/react'
 
 function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme } = useThemeStore()
+  const isDark = theme === 'dark'
   return (
     <div
       role="group"
       aria-label="Theme"
-      className="flex overflow-hidden rounded-[2px] border border-ink font-mono uppercase"
-      style={{ fontSize: compact ? 8 : 9, letterSpacing: compact ? '0.16em' : '0.18em' }}
+      className="relative flex overflow-hidden font-mono uppercase font-semibold"
+      style={{
+        fontSize: compact ? 10 : 11,
+        letterSpacing: compact ? '0.16em' : '0.18em',
+        border: '1.5px solid rgb(var(--ink))',
+        borderRadius: 3,
+        background: 'transparent',
+      }}
     >
+      {/* Sliding indicator */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          width: '50%',
+          background: 'rgb(var(--ink))',
+          borderRadius: 1,
+          transform: isDark ? 'translateX(100%)' : 'translateX(0)',
+          transition: 'transform 180ms ease',
+          pointerEvents: 'none',
+        }}
+      />
       <button
         type="button"
         onClick={() => setTheme('light')}
-        className="font-semibold transition-colors"
         style={{
-          padding: compact ? '5px 8px' : '6px 9px',
-          background: theme === 'light' ? 'rgb(var(--ink))' : 'transparent',
-          color: theme === 'light' ? 'rgb(var(--paper))' : 'rgb(var(--ink))',
+          position: 'relative',
+          zIndex: 1,
+          padding: compact ? '5px 8px' : '6px 10px',
+          background: 'transparent',
+          color: !isDark ? 'rgb(var(--paper))' : 'rgb(var(--ink-soft))',
+          transition: 'color 180ms ease',
+          border: 'none',
+          cursor: 'pointer',
         }}
       >
         {compact ? '☼' : '☼ Paper'}
@@ -28,11 +54,15 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
       <button
         type="button"
         onClick={() => setTheme('dark')}
-        className="font-semibold transition-colors"
         style={{
-          padding: compact ? '5px 8px' : '6px 9px',
-          background: theme === 'dark' ? 'rgb(var(--ink))' : 'transparent',
-          color: theme === 'dark' ? 'rgb(var(--paper))' : 'rgb(var(--ink))',
+          position: 'relative',
+          zIndex: 1,
+          padding: compact ? '5px 8px' : '6px 10px',
+          background: 'transparent',
+          color: isDark ? 'rgb(var(--paper))' : 'rgb(var(--ink-soft))',
+          transition: 'color 180ms ease',
+          border: 'none',
+          cursor: 'pointer',
         }}
       >
         {compact ? '☾' : '☾ Ink'}
@@ -92,7 +122,7 @@ export default function Layout() {
           </NavLink>
           <button
             onClick={handleLogout}
-            className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink-muted hover:text-ink"
+            className="font-mono text-[10px] tracking-[0.18em] uppercase font-semibold text-ink-muted hover:text-ink"
           >
             Log out
           </button>
