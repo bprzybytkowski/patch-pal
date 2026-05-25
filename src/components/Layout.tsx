@@ -46,6 +46,7 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
           color: !isDark ? 'rgb(var(--paper))' : 'rgb(var(--ink-soft))',
           transition: 'color 180ms ease',
           border: 'none',
+          outline: 'none',
           cursor: 'pointer',
         }}
       >
@@ -62,6 +63,7 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
           color: isDark ? 'rgb(var(--paper))' : 'rgb(var(--ink-soft))',
           transition: 'color 180ms ease',
           border: 'none',
+          outline: 'none',
           cursor: 'pointer',
         }}
       >

@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth'
 import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
 import BrandMark from '../components/BrandMark'
+import { ThemeToggle } from '../components/Layout'
 
 type Tab = 'signin' | 'signup'
 type View = 'form' | 'signed-up' | 'forgot' | 'forgot-sent'
@@ -24,35 +25,6 @@ const FIELD_INPUT: React.CSSProperties = {
   outline: 'none',
 }
 
-function ThemeToggle() {
-  const { theme, setTheme } = useThemeStore()
-  return (
-    <div
-      className="flex border border-ink rounded-[2px] overflow-hidden font-mono text-[9px] tracking-[0.18em] uppercase"
-      role="group"
-      aria-label="Theme"
-    >
-      <button
-        type="button"
-        onClick={() => setTheme('light')}
-        className={`px-[9px] py-[6px] font-semibold select-none ${
-          theme === 'light' ? 'bg-ink text-paper' : 'bg-transparent text-ink'
-        }`}
-      >
-        ☼ Paper
-      </button>
-      <button
-        type="button"
-        onClick={() => setTheme('dark')}
-        className={`px-[9px] py-[6px] font-semibold select-none ${
-          theme === 'dark' ? 'bg-ink text-paper' : 'bg-transparent text-ink'
-        }`}
-      >
-        ☾ Ink
-      </button>
-    </div>
-  )
-}
 
 export default function AuthPage() {
   const [tab, setTab] = useState<Tab>('signin')
