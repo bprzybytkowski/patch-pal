@@ -5,7 +5,6 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
 import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
-import BrandMark from '../components/BrandMark'
 import { ThemeToggle } from '../components/Layout'
 
 type Tab = 'signin' | 'signup'
@@ -107,18 +106,16 @@ export default function AuthPage() {
     >
       {/* Top bar */}
       <div className="w-full max-w-[920px] flex justify-between items-end mb-7 relative z-10">
-        <div className="flex items-center gap-3">
-          <BrandMark size={36} />
-          <div className="flex flex-col gap-0.5">
-            <h1 className="font-serif text-[30px] font-semibold tracking-[-0.01em] leading-none text-ink">
-              patch-pal
-            </h1>
-            <div className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-muted">
-              Studio journal · vol. 02
-            </div>
+        <div className="flex flex-col gap-0.5">
+          <h1 className="font-serif text-[30px] font-semibold tracking-[-0.01em] leading-none text-ink">
+            patch-pal
+          </h1>
+          <div className="font-mono text-[10px] tracking-[0.22em] uppercase text-ink-muted">
+            Studio journal · vol. 02
           </div>
         </div>
-        <ThemeToggle />
+        <span className="hidden sm:block"><ThemeToggle /></span>
+        <span className="sm:hidden"><ThemeToggle compact /></span>
       </div>
 
       {/* Card */}
