@@ -241,8 +241,13 @@ export default function SessionDetailPage() {
   }
 
   useEffect(() => {
-    if (session && (location.state as { continueTake?: boolean } | null)?.continueTake) {
+    if (!session) return
+    const state = location.state as { continueTake?: boolean; editing?: boolean } | null
+    if (state?.continueTake) {
       startEdit(true)
+      window.history.replaceState({}, '')
+    } else if (state?.editing) {
+      startEdit(false)
       window.history.replaceState({}, '')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -250,20 +255,20 @@ export default function SessionDetailPage() {
 
   const onSave = handleSubmit(async (values) => {
     const nextVersion = isContinue ? (session?.version ?? 1) + 1 : (session?.version ?? 1)
-    const { data } = await supabase
+    const updatedFields = {
+      title: values.title.trim(),
+      bpm: values.bpm ? parseInt(values.bpm) : null,
+      key_scale: values.key_scale.trim() || null,
+      ableton_project: values.ableton_project.trim() || null,
+      notes: values.notes.trim() || null,
+      mood_tags: tags,
+      version: nextVersion,
+    }
+    const { error } = await supabase
       .from('sessions')
-      .update({
-        title: values.title.trim(),
-        bpm: values.bpm ? parseInt(values.bpm) : null,
-        key_scale: values.key_scale.trim() || null,
-        ableton_project: values.ableton_project.trim() || null,
-        notes: values.notes.trim() || null,
-        mood_tags: tags,
-        version: nextVersion,
-      })
+      .update(updatedFields)
       .eq('id', id)
-      .select()
-    if (!data?.[0]) return
+    if (error) return
 
     await supabase.from('session_connections').delete().eq('session_id', id)
     if (editConnections.length > 0) {
@@ -284,7 +289,7 @@ export default function SessionDetailPage() {
       prev
         ? {
             ...prev,
-            ...data[0],
+            ...updatedFields,
             session_connections: editConnections.map((c, i) => ({
               id: '',
               session_id: id!,

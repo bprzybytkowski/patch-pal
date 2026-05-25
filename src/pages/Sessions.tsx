@@ -503,7 +503,7 @@ export default function SessionsPage() {
   }
 
   const handleEdit = () => {
-    if (activeSession) navigate(`/sessions/${activeSession.id}`)
+    if (activeSession) navigate(`/sessions/${activeSession.id}`, { state: { editing: true } })
   }
 
   return (
