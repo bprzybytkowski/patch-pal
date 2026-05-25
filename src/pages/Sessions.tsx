@@ -112,13 +112,11 @@ function RoleStamp({ role }: { role: string }) {
 function SessionDetailPanel({
   session,
   theme,
-  onFork,
   onDelete,
   onEdit,
 }: {
   session: Session
   theme: 'light' | 'dark'
-  onFork: () => void
   onDelete: () => void
   onEdit: () => void
 }) {
@@ -306,7 +304,7 @@ function SessionDetailPanel({
       {/* Footer actions */}
       <div className="flex items-center gap-3.5 pt-2 border-t border-dashed border-rule flex-wrap">
         <button
-          onClick={onFork}
+          onClick={onEdit}
           style={{
             background: 'rgb(var(--btn-bg))',
             color: 'rgb(var(--btn-text))',
@@ -322,14 +320,7 @@ function SessionDetailPanel({
             cursor: 'pointer',
           }}
         >
-          Continue this take →
-        </button>
-        <button
-          onClick={onEdit}
-          className="font-serif italic text-[14px] text-ink-soft underline cursor-pointer"
-          style={{ background: 'none', border: 'none' }}
-        >
-          edit
+          Continue / edit →
         </button>
         <div className="flex-1" />
         <button
@@ -485,12 +476,6 @@ export default function SessionsPage() {
     }
   }
 
-  const handleFork = () => {
-    if (!activeSession) return
-    posthog.capture('session_continued', { session_id: activeSession.id })
-    navigate(`/sessions/${activeSession.id}`, { state: { continueTake: true } })
-  }
-
   const handleDelete = async () => {
     if (!activeSession) return
     if (!window.confirm('Burn this page?')) return
@@ -628,7 +613,6 @@ export default function SessionsPage() {
               <SessionDetailPanel
                 session={activeSession}
                 theme={theme}
-                onFork={handleFork}
                 onDelete={handleDelete}
                 onEdit={handleEdit}
               />

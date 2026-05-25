@@ -8,6 +8,7 @@ import { useThemeStore } from '../store/theme'
 import { useMediaQuery } from '../lib/hooks'
 import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
+import { useAuthStore } from '../store/auth'
 
 const MOOD_SUGGESTIONS = [
   'dark', 'hypnotic', 'ambient', 'playful', 'broken',
@@ -164,11 +165,11 @@ export default function SessionDetailPage() {
   const posthog = usePostHog()
   const theme = useThemeStore((s) => s.theme)
   const isMobile = useMediaQuery('(max-width: 640px)')
+  const user = useAuthStore((s) => s.user)
 
   const [session, setSession] = useState<Session | null>(null)
   const [parentTitle, setParentTitle] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [isContinue, setIsContinue] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [editConnections, setEditConnections] = useState<{ fromName: string; toName: string; kind: CableKind; label: string }[]>([])
@@ -211,7 +212,7 @@ export default function SessionDetailPage() {
       })
   }, [id])
 
-  const startEdit = (continueMode = false) => {
+  const startEdit = () => {
     if (!session) return
     reset({
       title: session.title,
@@ -229,32 +230,30 @@ export default function SessionDetailPage() {
         label: c.label,
       })),
     )
-    setIsContinue(continueMode)
     setEditing(true)
-  }
-
-  const cancelEdit = () => {
-    setTags(session?.mood_tags ?? [])
-    setEditConnections([])
-    setIsContinue(false)
-    setEditing(false)
   }
 
   useEffect(() => {
     if (!session) return
-    const state = location.state as { continueTake?: boolean; editing?: boolean } | null
-    if (state?.continueTake) {
-      startEdit(true)
-      window.history.replaceState({}, '')
-    } else if (state?.editing) {
-      startEdit(false)
+    const state = location.state as { editing?: boolean } | null
+    if (state?.editing) {
+      startEdit()
       window.history.replaceState({}, '')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session])
 
-  const onSave = handleSubmit(async (values) => {
-    const nextVersion = isContinue ? (session?.version ?? 1) + 1 : (session?.version ?? 1)
+  const buildConnectionRows = (sessionId: string) =>
+    editConnections.map((c, i) => ({
+      session_id: sessionId,
+      from_name: c.fromName,
+      to_name: c.toName,
+      kind: c.kind,
+      label: c.label,
+      sort_order: i,
+    }))
+
+  const onSaveChanges = handleSubmit(async (values) => {
     const updatedFields = {
       title: values.title.trim(),
       bpm: values.bpm ? parseInt(values.bpm) : null,
@@ -262,26 +261,14 @@ export default function SessionDetailPage() {
       ableton_project: values.ableton_project.trim() || null,
       notes: values.notes.trim() || null,
       mood_tags: tags,
-      version: nextVersion,
+      version: session?.version ?? 1,
     }
-    const { error } = await supabase
-      .from('sessions')
-      .update(updatedFields)
-      .eq('id', id)
+    const { error } = await supabase.from('sessions').update(updatedFields).eq('id', id)
     if (error) return
 
     await supabase.from('session_connections').delete().eq('session_id', id)
     if (editConnections.length > 0) {
-      await supabase.from('session_connections').insert(
-        editConnections.map((c, i) => ({
-          session_id: id,
-          from_name: c.fromName,
-          to_name: c.toName,
-          kind: c.kind,
-          label: c.label,
-          sort_order: i,
-        })),
-      )
+      await supabase.from('session_connections').insert(buildConnectionRows(id!))
     }
 
     posthog.capture('session_updated', { session_id: id })
@@ -305,16 +292,50 @@ export default function SessionDetailPage() {
     setEditing(false)
   })
 
+  const onSaveAsNewTake = handleSubmit(async (values) => {
+    if (!user || !session) return
+    const { data: newRows } = await supabase
+      .from('sessions')
+      .insert({
+        user_id: user.id,
+        title: values.title.trim(),
+        bpm: values.bpm ? parseInt(values.bpm) : null,
+        key_scale: values.key_scale.trim() || null,
+        ableton_project: values.ableton_project.trim() || null,
+        notes: values.notes.trim() || null,
+        mood_tags: tags,
+        forked_from: id,
+        version: (session.version ?? 1) + 1,
+      })
+      .select()
+    if (!newRows?.[0]) return
+    const newId = newRows[0].id
+
+    if (session.session_devices.length > 0) {
+      await supabase.from('session_devices').insert(
+        session.session_devices.map((sd, i) => ({
+          session_id: newId,
+          device_id: sd.device_id,
+          sync_role: sd.sync_role,
+          sync_mode: sd.sync_mode,
+          patch_notes: sd.patch_notes,
+          sort_order: i,
+        })),
+      )
+    }
+    if (editConnections.length > 0) {
+      await supabase.from('session_connections').insert(buildConnectionRows(newId))
+    }
+
+    posthog.capture('session_created', { session_id: newId, is_fork: true })
+    navigate(`/sessions/${newId}`)
+  })
+
   const handleDelete = async () => {
     if (!window.confirm('Burn this page?')) return
     posthog.capture('session_deleted', { session_id: id })
     await supabase.from('sessions').delete().eq('id', id)
     navigate('/sessions')
-  }
-
-  const handleContinue = () => {
-    posthog.capture('session_continued', { session_id: id })
-    startEdit(true)
   }
 
   if (!session) return null
@@ -355,9 +376,9 @@ export default function SessionDetailPage() {
         }}
       >
         {editing ? (
-          <form onSubmit={onSave} className="flex flex-col gap-5">
+          <form className="flex flex-col gap-5">
             <h2 className="font-serif font-semibold text-[24px] text-ink leading-tight">
-              {isContinue ? 'Continue this take' : 'Edit session'}
+              Edit session
             </h2>
 
             <FieldInput label="Title" id="title">
@@ -481,7 +502,8 @@ export default function SessionDetailPage() {
 
             <div className="flex items-center gap-4 pt-2 border-t border-dashed border-rule">
               <button
-                type="submit"
+                type="button"
+                onClick={onSaveAsNewTake}
                 style={{
                   background: 'rgb(var(--btn-bg))',
                   color: 'rgb(var(--btn-text))',
@@ -497,15 +519,15 @@ export default function SessionDetailPage() {
                   cursor: 'pointer',
                 }}
               >
-                {isContinue ? 'Save take' : 'Save changes'}
+                Save as a new take →
               </button>
               <button
                 type="button"
-                onClick={cancelEdit}
+                onClick={onSaveChanges}
                 className="font-serif italic text-[14px] text-ink-soft underline"
                 style={{ background: 'none', border: 'none', cursor: 'pointer' }}
               >
-                cancel
+                save changes
               </button>
             </div>
           </form>
@@ -684,7 +706,7 @@ export default function SessionDetailPage() {
             {/* Footer actions */}
             <div className="flex items-center gap-3.5 pt-2 border-t border-dashed border-rule flex-wrap">
               <button
-                onClick={handleContinue}
+                onClick={startEdit}
                 style={{
                   background: 'rgb(var(--btn-bg))',
                   color: 'rgb(var(--btn-text))',
@@ -701,14 +723,7 @@ export default function SessionDetailPage() {
                   width: isMobile ? '100%' : 'auto',
                 }}
               >
-                Continue this take →
-              </button>
-              <button
-                onClick={() => startEdit()}
-                className="font-serif italic text-[14px] text-ink-soft underline"
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                edit
+                Continue / edit →
               </button>
               <div className="flex-1" />
               <button
