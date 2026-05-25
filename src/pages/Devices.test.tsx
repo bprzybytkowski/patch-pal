@@ -71,7 +71,7 @@ describe('Devices page', () => {
     mockFrom.mockReturnValueOnce(makeLoadMock() as never)
     render(<DevicesPage />)
     expect(await screen.findByLabelText(/name/i)).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: /type/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /pocket operator/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /add device/i })).toBeInTheDocument()
   })
 
@@ -79,7 +79,7 @@ describe('Devices page', () => {
     mockFrom.mockReturnValueOnce(makeLoadMock([existingDevice]) as never)
     render(<DevicesPage />)
     expect(await screen.findByText('PO-33')).toBeInTheDocument()
-    expect(screen.getByTestId('type-badge')).toHaveTextContent('Pocket Operator')
+    expect(screen.getAllByText('Pocket Operator').length).toBeGreaterThan(0)
   })
 
   it('submitting the form adds the new device to the list and resets the form', async () => {
@@ -92,7 +92,7 @@ describe('Devices page', () => {
     await screen.findByLabelText(/name/i)
 
     await userEvent.type(screen.getByLabelText(/name/i), 'Digitakt')
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: /type/i }), 'drum_machine')
+    await userEvent.click(screen.getByRole('button', { name: /drum machine/i }))
     await userEvent.click(screen.getByRole('button', { name: /add device/i }))
 
     expect(await screen.findByText('Digitakt')).toBeInTheDocument()

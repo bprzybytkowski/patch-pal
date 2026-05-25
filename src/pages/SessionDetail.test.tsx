@@ -102,7 +102,7 @@ describe('Session detail', () => {
       .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
       .mockReturnValueOnce(makeDeleteMock() as never)
     renderDetail()
-    await userEvent.click(await screen.findByRole('button', { name: /delete session/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
     expect(mockNavigate).toHaveBeenCalledWith('/sessions')
   })
 
@@ -110,12 +110,12 @@ describe('Session detail', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false)
     mockFrom.mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
     renderDetail()
-    await userEvent.click(await screen.findByRole('button', { name: /delete session/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
     expect(mockNavigate).not.toHaveBeenCalled()
     expect(mockFrom).toHaveBeenCalledTimes(1)
   })
 
-  it('"Continue from this session" navigates to /sessions/new with fork state', async () => {
+  it('"Continue this take" navigates to /sessions/new with fork state', async () => {
     const session = makeSession({
       bpm: 120,
       key_scale: 'A minor',
@@ -126,7 +126,7 @@ describe('Session detail', () => {
     })
     mockFrom.mockReturnValueOnce(makeSessionFetch(session) as never)
     renderDetail()
-    await userEvent.click(await screen.findByRole('button', { name: /continue from this session/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /continue this take/i }))
     expect(mockNavigate).toHaveBeenCalledWith('/sessions/new', {
       state: {
         forkedFrom: 'sess-1',
@@ -186,10 +186,10 @@ describe('Session detail', () => {
     })
     mockFrom.mockReturnValueOnce(makeSessionFetch(session) as never)
     renderDetail()
-    expect(await screen.findByText('120 BPM')).toBeInTheDocument()
+    expect(await screen.findByText('120')).toBeInTheDocument()
     expect(screen.getByText('great session')).toBeInTheDocument()
-    expect(screen.getByText('PO-33')).toBeInTheDocument()
+    expect((await screen.findAllByText('PO-33')).length).toBeGreaterThan(0)
     expect(screen.getByText('SY2')).toBeInTheDocument()
-    expect(screen.getByText('bass patch')).toBeInTheDocument()
+    expect(screen.getByText('"bass patch"')).toBeInTheDocument()
   })
 })

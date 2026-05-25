@@ -2,10 +2,29 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
-import { DEVICE_TYPE_LABELS, DEVICE_TYPE_BADGE, type DeviceType } from './Devices'
+import { DEVICE_TYPE_LABELS, type DeviceType } from './Devices'
 import { usePostHog } from '@posthog/react'
+import { useThemeStore } from '../store/theme'
+import { useMediaQuery } from '../lib/hooks'
+import { MOOD_COLOR } from '../lib/moodColors'
+import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 
-const MOOD_SUGGESTIONS = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi'] as const
+const MOOD_SUGGESTIONS = [
+  'dark', 'hypnotic', 'ambient', 'playful', 'broken',
+  'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi',
+] as const
+
+export type CableKind = 'midi' | 'sync' | 'audio'
+
+export interface SessionConnection {
+  id: string
+  session_id: string
+  from_name: string
+  to_name: string
+  kind: CableKind
+  label: string
+  sort_order: number
+}
 
 interface SessionDeviceRow {
   id: string
@@ -28,6 +47,7 @@ interface Session {
   forked_from: string | null
   created_at: string
   session_devices: SessionDeviceRow[]
+  session_connections: SessionConnection[]
 }
 
 interface EditFields {
@@ -38,10 +58,111 @@ interface EditFields {
   notes: string
 }
 
+function formatRelative(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  if (minutes > 0) return `${minutes}m ago`
+  return 'just now'
+}
+
+function MoodSticker({ tag, theme }: { tag: string; theme: 'light' | 'dark' }) {
+  const bg = MOOD_COLOR[theme][tag] ?? 'rgb(var(--rule-soft))'
+  return (
+    <span
+      style={{
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: 10,
+        letterSpacing: '0.06em',
+        textTransform: 'lowercase',
+        color: theme === 'dark' ? 'rgb(var(--paper))' : 'rgb(var(--ink))',
+        background: bg,
+        padding: '3px 8px 2px',
+        borderRadius: 12,
+        border: theme === 'dark' ? '1px solid rgba(0,0,0,0.4)' : '1px solid rgba(40,30,10,0.18)',
+        boxShadow: theme === 'dark' ? '1px 1px 0 rgba(0,0,0,0.5)' : '1px 1px 0 rgba(40,30,10,0.12)',
+        display: 'inline-block',
+        lineHeight: 1,
+      }}
+    >
+      {tag}
+    </span>
+  )
+}
+
+function RoleStamp({ role }: { role: string }) {
+  const colors =
+    role === 'master'
+      ? { c: 'rgb(var(--accent))', bg: 'rgb(var(--accent-soft))' }
+      : role === 'slave'
+      ? { c: '#3a5a2a', bg: '#e6efd4' }
+      : { c: 'rgb(var(--ink-soft))', bg: 'rgb(var(--rule-soft))' }
+  return (
+    <span
+      style={{
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: 9,
+        letterSpacing: '0.22em',
+        textTransform: 'uppercase',
+        fontWeight: 700,
+        color: colors.c,
+        background: colors.bg,
+        border: `1.5px solid ${colors.c}`,
+        padding: '4px 10px 3px',
+        borderRadius: 2,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {role}
+    </span>
+  )
+}
+
+function FieldInput({
+  label,
+  id,
+  children,
+}: {
+  label: string
+  id: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={id}
+        className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted"
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+const fieldInputStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  borderBottom: '1.5px solid rgb(var(--ink))',
+  padding: '6px 0',
+  fontFamily: '"Spectral", serif',
+  fontStyle: 'italic',
+  fontSize: 16,
+  color: 'rgb(var(--ink))',
+  outline: 'none',
+  width: '100%',
+}
+
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const posthog = usePostHog()
+  const theme = useThemeStore((s) => s.theme)
+  const isMobile = useMediaQuery('(max-width: 640px)')
+
   const [session, setSession] = useState<Session | null>(null)
   const [parentTitle, setParentTitle] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
@@ -55,12 +176,12 @@ export default function SessionDetailPage() {
   }
   const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag))
 
-  const { register, handleSubmit, reset } = useForm<EditFields>()
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<EditFields>()
 
   useEffect(() => {
     supabase
       .from('sessions')
-      .select('*, session_devices(*, devices(*))')
+      .select('*, session_devices(*, devices(*)), session_connections(*)')
       .eq('id', id)
       .single()
       .then(({ data }) => {
@@ -115,13 +236,13 @@ export default function SessionDetailPage() {
       .select()
     if (data?.[0]) {
       posthog.capture('session_updated', { session_id: id })
-      setSession((prev) => prev ? { ...prev, ...data[0] } : prev)
+      setSession((prev) => (prev ? { ...prev, ...data[0] } : prev))
       setEditing(false)
     }
   })
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this session?')) return
+    if (!window.confirm('Burn this page?')) return
     posthog.capture('session_deleted', { session_id: id })
     await supabase.from('sessions').delete().eq('id', id)
     navigate('/sessions')
@@ -153,171 +274,399 @@ export default function SessionDetailPage() {
 
   if (!session) return null
 
+  const connections: SignalFlowConnection[] = (session.session_connections ?? []).map((c) => ({
+    from: c.from_name,
+    to: c.to_name,
+    kind: c.kind,
+    label: c.label,
+  }))
+  const sfDevices: SignalFlowDevice[] = session.session_devices.map((sd) => ({
+    name: sd.devices.name,
+    role: sd.sync_role,
+    type: sd.devices.type,
+    sync: sd.sync_mode,
+  }))
+
   return (
-    <div className="p-6 max-w-2xl mx-auto flex flex-col gap-6">
+    <div className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">
       {session.forked_from && parentTitle && (
         <Link
           to={`/sessions/${session.forked_from}`}
-          className="inline-flex items-center gap-1 text-xs text-zinc-400 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 self-start hover:text-zinc-100"
+          className="inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-soft mb-6"
         >
-          Continued from: <span className="text-zinc-200 ml-1">{parentTitle}</span>
+          ← Continued from: <span className="text-ink ml-1">{parentTitle}</span>
         </Link>
       )}
 
-      {editing ? (
-        <form onSubmit={onSave} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="title" className="text-xs text-zinc-400">Title</label>
-            <input
-              id="title"
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              {...register('title', { required: true })}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="bpm" className="text-xs text-zinc-400">BPM</label>
-            <input
-              id="bpm"
-              type="number"
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              {...register('bpm')}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="key_scale" className="text-xs text-zinc-400">Key / Scale</label>
-            <input
-              id="key_scale"
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              {...register('key_scale')}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="ableton_project" className="text-xs text-zinc-400">Ableton project</label>
-            <input
-              id="ableton_project"
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              {...register('ableton_project')}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="notes" className="text-xs text-zinc-400">Notes</label>
-            <textarea
-              id="notes"
-              rows={3}
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-              {...register('notes')}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-xs text-zinc-400">Mood tags</span>
-            <div className="flex flex-wrap gap-1">
-              {tags.map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs px-2 py-0.5 rounded">
-                  {tag}
-                  <button type="button" aria-label={`remove ${tag}`} onClick={() => removeTag(tag)} className="text-zinc-500 hover:text-zinc-300">×</button>
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {MOOD_SUGGESTIONS.filter((s) => !tags.includes(s)).map((s) => (
-                <button key={s} type="button" onClick={() => addTag(s)} className="text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-900 border border-zinc-700 px-2 py-0.5 rounded">{s}</button>
-              ))}
-            </div>
-            <input
-              placeholder="Add a custom tag"
-              className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput); setTagInput('') } }}
-            />
-          </div>
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
-            >
-              Save changes
-            </button>
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="text-zinc-400 hover:text-zinc-100 text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-start justify-between">
-            <h1 className="text-zinc-100 text-lg font-medium">{session.title}</h1>
-            <button
-              onClick={startEdit}
-              className="text-zinc-400 hover:text-zinc-100 text-sm"
-            >
-              Edit
-            </button>
-          </div>
+      {/* Cream paper card */}
+      <div
+        className="rounded-[4px] p-[28px_30px_28px] sm:p-[36px_38px_32px] overflow-hidden relative"
+        style={{
+          background: 'linear-gradient(180deg, #fffaee 0%, #faf0d8 100%)',
+          boxShadow: theme === 'dark'
+            ? '0 1px 0 rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.4), 0 30px 60px rgba(0,0,0,0.3)'
+            : '0 1px 0 rgba(40,30,10,0.05), 0 10px 24px rgba(80,55,20,0.12), 0 30px 60px rgba(80,55,20,0.08)',
+          border: '1px solid rgb(var(--rule-soft))',
+        }}
+      >
+        {editing ? (
+          <form onSubmit={onSave} className="flex flex-col gap-5">
+            <h2 className="font-serif font-semibold text-[24px] text-ink leading-tight">
+              Edit session
+            </h2>
 
-          {session.bpm !== null && (
-            <span className="font-mono text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded self-start">
-              {session.bpm} BPM
-            </span>
-          )}
-          {session.key_scale && (
-            <p className="text-sm text-zinc-400">{session.key_scale}</p>
-          )}
-          {session.mood_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {session.mood_tags.map((tag) => (
-                <span key={tag} className="text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">
-                  {tag}
-                </span>
-              ))}
+            <FieldInput label="Title" id="title">
+              <input
+                id="title"
+                style={fieldInputStyle}
+                {...register('title', { required: 'Title is required' })}
+              />
+              {errors.title && (
+                <p className="font-serif italic text-[14px] text-accent">{errors.title.message}</p>
+              )}
+            </FieldInput>
+
+            <FieldInput label="♩= BPM" id="bpm">
+              <input
+                id="bpm"
+                type="number"
+                style={{ ...fieldInputStyle, fontSize: 42, fontWeight: 700, color: 'rgb(var(--accent))' }}
+                {...register('bpm', {
+                  min: { value: 1, message: 'BPM must be between 1 and 399' },
+                  max: { value: 399, message: 'BPM must be between 1 and 399' },
+                })}
+              />
+              {errors.bpm && (
+                <p className="font-serif italic text-[14px] text-accent">{errors.bpm.message}</p>
+              )}
+            </FieldInput>
+
+            <FieldInput label="Key / Scale" id="key_scale">
+              <input id="key_scale" style={fieldInputStyle} {...register('key_scale')} />
+            </FieldInput>
+
+            <FieldInput label="Ableton project" id="ableton_project">
+              <input id="ableton_project" style={fieldInputStyle} {...register('ableton_project')} />
+            </FieldInput>
+
+            <FieldInput label="Field notes" id="notes">
+              <textarea
+                id="notes"
+                rows={3}
+                style={{ ...fieldInputStyle, resize: 'none' }}
+                {...register('notes')}
+              />
+            </FieldInput>
+
+            <div className="flex flex-col gap-2">
+              <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">Mood</span>
+              <div className="flex flex-wrap gap-2">
+                {MOOD_SUGGESTIONS.map((s) => {
+                  const sel = tags.includes(s)
+                  const bg = sel
+                    ? (MOOD_COLOR[theme][s] ?? 'rgb(var(--tape))')
+                    : 'transparent'
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => sel ? removeTag(s) : addTag(s)}
+                      style={{
+                        fontFamily: '"JetBrains Mono", monospace',
+                        fontSize: 10,
+                        letterSpacing: '0.06em',
+                        textTransform: 'lowercase',
+                        color: theme === 'dark' ? 'rgb(var(--paper))' : 'rgb(var(--ink))',
+                        background: bg,
+                        padding: '5px 10px 4px',
+                        borderRadius: 12,
+                        border: `1px ${sel ? 'solid' : 'dashed'} rgb(var(--ink))`,
+                        cursor: 'pointer',
+                        opacity: sel ? 1 : 0.65,
+                      }}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {tags
+                  .filter((t) => !MOOD_SUGGESTIONS.includes(t as typeof MOOD_SUGGESTIONS[number]))
+                  .map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 font-mono text-[10px] text-ink-soft"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        aria-label={`remove ${tag}`}
+                        onClick={() => removeTag(tag)}
+                        className="text-ink-muted hover:text-ink"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+              </div>
+              <input
+                placeholder="Add a custom tag"
+                style={{ ...fieldInputStyle, fontSize: 14 }}
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addTag(tagInput)
+                    setTagInput('')
+                  }
+                }}
+              />
             </div>
-          )}
-          {session.notes && (
-            <p className="text-sm text-zinc-300 whitespace-pre-wrap">{session.notes}</p>
-          )}
-          {session.ableton_project && (
-            <p className="text-xs text-zinc-400">{session.ableton_project}</p>
-          )}
-          {session.session_devices.length > 0 && (
-            <div className="flex flex-col gap-3">
-              {session.session_devices.map((sd) => (
-                <div key={sd.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-zinc-100 text-sm font-medium">{sd.devices.name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${DEVICE_TYPE_BADGE[sd.devices.type]}`}>
-                      {DEVICE_TYPE_LABELS[sd.devices.type]}
+
+            <div className="flex items-center gap-4 pt-2 border-t border-dashed border-rule">
+              <button
+                type="submit"
+                style={{
+                  background: 'rgb(var(--btn-bg))',
+                  color: 'rgb(var(--btn-text))',
+                  padding: '10px 18px',
+                  fontFamily: '"JetBrains Mono", monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  fontWeight: 700,
+                  boxShadow: '3px 3px 0 rgb(var(--accent))',
+                  borderRadius: 2,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Save changes
+              </button>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="font-serif italic text-[14px] text-ink-soft underline"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex flex-col gap-[22px] relative">
+            {/* Page stamp */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                border: '2px solid rgb(var(--accent))',
+                color: 'rgb(var(--accent))',
+                padding: '4px 10px',
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 10,
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+                fontWeight: 700,
+                transform: 'rotate(-8deg)',
+                opacity: 0.8,
+                transformOrigin: 'top right',
+              }}
+            >
+              Take · 01
+            </div>
+
+            {/* Title */}
+            <div>
+              <h1
+                className="font-serif font-semibold text-ink"
+                style={{
+                  fontSize: isMobile ? 28 : 38,
+                  lineHeight: 1.05,
+                  letterSpacing: '-0.02em',
+                  maxWidth: 380,
+                }}
+              >
+                {session.title}
+              </h1>
+              <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-muted mt-1.5">
+                Logged {formatRelative(session.created_at)}
+                {session.ableton_project && ` · ${session.ableton_project}`}
+              </div>
+            </div>
+
+            {/* BPM hero */}
+            {session.bpm !== null && (
+              <div
+                className="flex items-baseline gap-4 pb-1 border-b border-rule flex-wrap"
+              >
+                <span
+                  className="font-serif italic text-ink"
+                  style={{ fontSize: isMobile ? 28 : 36, opacity: 0.5, lineHeight: 1 }}
+                >
+                  ♩=
+                </span>
+                <span
+                  className="font-serif italic font-bold text-accent"
+                  style={{ fontSize: isMobile ? 56 : 86, lineHeight: 1, letterSpacing: '-0.02em' }}
+                >
+                  {session.bpm}
+                </span>
+                {session.key_scale && (
+                  <div className="flex flex-col gap-0.5 ml-2">
+                    <span className="font-mono text-[11px] tracking-[0.22em] uppercase text-ink-muted">
+                      Key
+                    </span>
+                    <span className="font-serif italic text-[22px] text-ink">
+                      {session.key_scale}
                     </span>
                   </div>
-                  {sd.sync_mode && (
-                    <p className="font-mono text-xs text-zinc-400">{sd.sync_mode}</p>
-                  )}
-                  {sd.patch_notes && (
-                    <p className="text-xs text-zinc-400 whitespace-pre-wrap">{sd.patch_notes}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                )}
+                <div className="flex-1" />
+                {session.mood_tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {session.mood_tags.map((t) => (
+                      <MoodSticker key={t} tag={t} theme={theme} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-      <div className="flex flex-col gap-3 pt-4 border-t border-zinc-800">
-        <button
-          onClick={handleFork}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium self-start"
-        >
-          Continue from this session
-        </button>
-        <button
-          onClick={handleDelete}
-          className="text-red-400 hover:text-red-300 text-sm self-start"
-        >
-          Delete session
-        </button>
+            {/* Signal flow */}
+            {session.session_devices.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2.5 font-mono text-[10px] tracking-[0.28em] uppercase text-ink-muted mb-2">
+                  <span>Signal flow</span>
+                  <span className="flex-1 h-px bg-rule" />
+                  <span>{connections.length} cables</span>
+                </div>
+                <div
+                  style={{
+                    background: 'rgba(0,0,0,0.025)',
+                    border: '1px dashed rgb(var(--rule))',
+                    borderRadius: 4,
+                    padding: '14px 16px 10px',
+                  }}
+                >
+                  <SignalFlow
+                    devices={sfDevices}
+                    connections={connections}
+                    theme={theme}
+                    compact={isMobile}
+                  />
+                  {(() => {
+                    const master = session.session_devices.find((sd) => sd.sync_role === 'master')
+                    return master ? (
+                      <div className="text-center font-serif italic text-[13px] text-ink-soft mt-1.5">
+                        {master.devices.name} clocks the rig; FX chain feeds the mixer.
+                      </div>
+                    ) : null
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Gear & patches */}
+            {session.session_devices.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2.5 font-mono text-[10px] tracking-[0.28em] uppercase text-ink-muted mb-2">
+                  <span>Gear &amp; patches</span>
+                  <span className="flex-1 h-px bg-rule" />
+                  <span>{session.session_devices.length} items</span>
+                </div>
+                {session.session_devices.map((sd, i) => (
+                  <div
+                    key={sd.id}
+                    className="grid gap-3.5 pb-3.5 mb-3.5 border-b border-dashed border-rule last:border-0 last:mb-0 last:pb-0"
+                    style={{ gridTemplateColumns: '26px 1fr auto', alignItems: 'start' }}
+                  >
+                    <div className="font-serif italic font-bold text-[22px] text-accent leading-none">
+                      {String(i + 1).padStart(2, '0')}
+                    </div>
+                    <div>
+                      <div className="font-serif font-semibold text-[18px] text-ink leading-tight">
+                        {sd.devices.name}
+                      </div>
+                      <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-muted mt-0.5">
+                        {DEVICE_TYPE_LABELS[sd.devices.type]}
+                      </div>
+                      {sd.sync_mode && (
+                        <div className="font-mono text-[11px] text-ink-soft mt-2">
+                          sync · {sd.sync_mode}
+                        </div>
+                      )}
+                      {sd.patch_notes && (
+                        <div className="font-serif italic text-[14px] text-ink-mid mt-1.5 leading-[1.45]">
+                          "{sd.patch_notes}"
+                        </div>
+                      )}
+                    </div>
+                    <RoleStamp role={sd.sync_role} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Field notes */}
+            {session.notes && (
+              <div>
+                <div className="flex items-center gap-2.5 font-mono text-[10px] tracking-[0.28em] uppercase text-ink-muted mb-2">
+                  <span>Field notes</span>
+                  <span className="flex-1 h-px bg-rule" />
+                </div>
+                <div
+                  className="font-serif italic text-[17px] text-ink-mid leading-[1.5]"
+                  style={{ borderLeft: '3px solid rgb(var(--accent))', paddingLeft: 16 }}
+                >
+                  {session.notes}
+                </div>
+              </div>
+            )}
+
+            {/* Footer actions */}
+            <div className="flex items-center gap-3.5 pt-2 border-t border-dashed border-rule flex-wrap">
+              <button
+                onClick={handleFork}
+                style={{
+                  background: 'rgb(var(--btn-bg))',
+                  color: 'rgb(var(--btn-text))',
+                  padding: '10px 18px',
+                  fontFamily: '"JetBrains Mono", monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  fontWeight: 700,
+                  boxShadow: '3px 3px 0 rgb(var(--accent))',
+                  borderRadius: 2,
+                  border: 'none',
+                  cursor: 'pointer',
+                  width: isMobile ? '100%' : 'auto',
+                }}
+              >
+                Continue this take →
+              </button>
+              <button
+                onClick={startEdit}
+                className="font-serif italic text-[14px] text-ink-soft underline"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                edit
+              </button>
+              <div className="flex-1" />
+              <button
+                onClick={handleDelete}
+                className="font-serif italic text-[14px] text-accent underline"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                burn this page
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -79,32 +79,31 @@ describe('New session form', () => {
     expect(await screen.findByText(/bpm must be between 1 and 399/i)).toBeInTheDocument()
   })
 
-  it('typing and pressing Enter adds a mood tag pill; clicking × removes it', async () => {
+  it('renders predefined mood chip buttons', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
-    const tagInput = screen.getByPlaceholderText(/add a custom tag/i)
-    await userEvent.type(tagInput, 'dark{Enter}')
-    expect(screen.getByText('dark')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /remove dark/i }))
-    expect(screen.queryByRole('button', { name: /remove dark/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^dark$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^ambient$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^lo-fi$/i })).toBeInTheDocument()
   })
 
-  it('tags are stored lowercase and trimmed', async () => {
+  it('clicking a mood chip selects it; clicking again deselects it', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
-    await userEvent.type(screen.getByPlaceholderText(/add a custom tag/i), '  DARK  {Enter}')
-    expect(screen.getByText('dark')).toBeInTheDocument()
+    const darkChip = screen.getByRole('button', { name: /^dark$/i })
+    await userEvent.click(darkChip)
+    expect(screen.getByRole('button', { name: /^dark$/i })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^dark$/i }))
+    expect(screen.getByRole('button', { name: /^dark$/i })).toBeInTheDocument()
   })
 
-  it('enforces maximum of 10 mood tags', async () => {
+  it('all 10 predefined mood chips are rendered', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
-    const tagInput = screen.getByPlaceholderText(/add a custom tag/i)
-    for (let i = 1; i <= 10; i++) {
-      await userEvent.type(tagInput, `tag${i}{Enter}`)
+    const moodChips = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi']
+    for (const chip of moodChips) {
+      expect(screen.getByRole('button', { name: new RegExp(`^${chip}$`, 'i') })).toBeInTheDocument()
     }
-    await userEvent.type(tagInput, 'tag11{Enter}')
-    expect(screen.queryByText('tag11')).not.toBeInTheDocument()
   })
 
   it('Add device button opens inline picker with available devices', async () => {
@@ -141,7 +140,7 @@ describe('New session form', () => {
     await userEvent.selectOptions(await screen.findByRole('combobox'), 'dev-1')
     await screen.findByText('PO-33')
     const standaloneBtn = screen.getByRole('button', { name: /standalone/i })
-    expect(standaloneBtn).toHaveClass('bg-indigo-600')
+    expect(standaloneBtn).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(screen.getByRole('button', { name: /remove device/i }))
     expect(screen.queryByText('PO-33')).not.toBeInTheDocument()
   })
@@ -202,6 +201,6 @@ describe('New session form', () => {
     expect(screen.getByDisplayValue('SY2')).toBeInTheDocument()
     expect(screen.getByDisplayValue('bass patch')).toBeInTheDocument()
     const masterBtn = screen.getByRole('button', { name: /master/i })
-    expect(masterBtn).toHaveClass('bg-indigo-600')
+    expect(masterBtn).toHaveAttribute('aria-pressed', 'true')
   })
 })

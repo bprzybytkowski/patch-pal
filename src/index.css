@@ -1,3 +1,71 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root,
+  [data-theme='light'] {
+    --paper:        255 250 238;
+    --ink:          26 24 20;
+    --ink-mid:      58 48 38;
+    --ink-soft:     90 74 48;
+    --ink-muted:    138 111 69;
+    --rule:         216 198 154;
+    --rule-soft:    227 211 168;
+    --accent:       193 59 42;
+    --accent-soft:  251 232 222;
+    --card-active:  253 246 230;
+    --btn-bg:       26 24 20;
+    --btn-text:     251 243 226;
+    --tape:         244 211 94;
+    --page-bg-grad: radial-gradient(ellipse at 30% 0%, #fbf3e2 0%, #f1e7d0 70%, #ebdfc3 100%);
+    --paper-grad:   linear-gradient(180deg, #fffaee 0%, #faf0d8 100%);
+  }
+
+  [data-theme='dark'] {
+    --paper:        22 31 44;
+    --ink:          243 232 204;
+    --ink-mid:      203 191 159;
+    --ink-soft:     168 152 120;
+    --ink-muted:    122 108 77;
+    --rule:         51 64 90;
+    --rule-soft:    42 53 72;
+    --accent:       255 133 104;
+    --accent-soft:  58 31 23;
+    --card-active:  29 39 56;
+    --btn-bg:       243 232 204;
+    --btn-text:     14 22 32;
+    --tape:         244 211 94;
+    --page-bg-grad: radial-gradient(ellipse at 30% 0%, #1a2230 0%, #0e1620 70%, #070b13 100%);
+    --paper-grad:   linear-gradient(180deg, #18222f 0%, #11192a 100%);
+  }
+
+  html {
+    background: var(--page-bg-grad) fixed;
+    color: rgb(var(--ink));
+  }
+
+  body {
+    font-family: 'Spectral', Georgia, serif;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(67, 40, 20, 0.025) 0 1px,
+      transparent 1px 4px
+    );
+    mix-blend-mode: multiply;
+    opacity: 0.6;
+  }
+
+  [data-theme='dark'] body::before {
+    mix-blend-mode: screen;
+    opacity: 0.18;
+  }
+}

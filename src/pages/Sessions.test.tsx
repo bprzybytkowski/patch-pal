@@ -18,6 +18,19 @@ function makeSessionsFetch(sessions: unknown[] = []) {
   }
 }
 
+function makeActiveSessionFetch(session: unknown = null) {
+  return {
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: session ? { ...(session as object), session_connections: [] } : null,
+          error: null,
+        }),
+      }),
+    }),
+  }
+}
+
 function renderSessions() {
   render(
     <MemoryRouter>
@@ -49,25 +62,31 @@ beforeEach(() => {
 })
 
 describe('Sessions list', () => {
-  it('renders Sessions heading and New session link', async () => {
+  it('renders Sessions heading and New entry link', async () => {
     mockFrom.mockReturnValueOnce(makeSessionsFetch() as never)
     renderSessions()
     expect(await screen.findByRole('heading', { name: /sessions/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /new session/i })).toHaveAttribute('href', '/sessions/new')
+    expect(screen.getByRole('link', { name: /new entry/i })).toHaveAttribute('href', '/sessions/new')
   })
 
   it('clicking a session card links to the session detail', async () => {
-    mockFrom.mockReturnValueOnce(makeSessionsFetch([makeSession()]) as never)
+    const session = makeSession()
+    mockFrom
+      .mockReturnValueOnce(makeSessionsFetch([session]) as never)
+      .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
     renderSessions()
     const card = await screen.findByRole('link', { name: /late night jam/i })
     expect(card).toHaveAttribute('href', '/sessions/sess-1')
   })
 
   it('shows no-results message when search matches nothing', async () => {
-    mockFrom.mockReturnValueOnce(makeSessionsFetch([makeSession()]) as never)
+    const session = makeSession()
+    mockFrom
+      .mockReturnValueOnce(makeSessionsFetch([session]) as never)
+      .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
     renderSessions()
     await screen.findByText('Late night jam')
-    await userEvent.type(screen.getByPlaceholderText(/search sessions/i), 'zzznomatch')
+    await userEvent.type(screen.getByPlaceholderText(/search the ledger/i), 'zzznomatch')
     expect(screen.getByText(/no sessions match your search/i)).toBeInTheDocument()
   })
 
@@ -76,18 +95,20 @@ describe('Sessions list', () => {
       makeSession({ id: 'sess-1', title: 'Late night jam', notes: null }),
       makeSession({ id: 'sess-2', title: 'Morning ambient', notes: 'layered pads' }),
     ]
-    mockFrom.mockReturnValueOnce(makeSessionsFetch(sessions) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionsFetch(sessions) as never)
+      .mockReturnValueOnce(makeActiveSessionFetch(sessions[0]) as never)
     renderSessions()
     await screen.findByText('Late night jam')
 
-    await userEvent.type(screen.getByPlaceholderText(/search sessions/i), 'ambient')
+    await userEvent.type(screen.getByPlaceholderText(/search the ledger/i), 'ambient')
     expect(screen.getByText('Morning ambient')).toBeInTheDocument()
-    expect(screen.queryByText('Late night jam')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /late night jam/i })).not.toBeInTheDocument()
 
-    await userEvent.clear(screen.getByPlaceholderText(/search sessions/i))
-    await userEvent.type(screen.getByPlaceholderText(/search sessions/i), 'layered')
+    await userEvent.clear(screen.getByPlaceholderText(/search the ledger/i))
+    await userEvent.type(screen.getByPlaceholderText(/search the ledger/i), 'layered')
     expect(screen.getByText('Morning ambient')).toBeInTheDocument()
-    expect(screen.queryByText('Late night jam')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /late night jam/i })).not.toBeInTheDocument()
   })
 
   it('shows device chips with name for each linked device', async () => {
@@ -96,37 +117,44 @@ describe('Sessions list', () => {
         { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sort_order: 0, devices: PO_DEVICE },
       ],
     })
-    mockFrom.mockReturnValueOnce(makeSessionsFetch([sessionWithDevice]) as never)
+    mockFrom
+      .mockReturnValueOnce(makeSessionsFetch([sessionWithDevice]) as never)
+      .mockReturnValueOnce(makeActiveSessionFetch(sessionWithDevice) as never)
     renderSessions()
-    expect(await screen.findByText('PO-33')).toBeInTheDocument()
+    expect((await screen.findAllByText('PO-33')).length).toBeGreaterThan(0)
   })
 
-  it('shows up to 3 mood tag pills and an overflow count', async () => {
-    mockFrom.mockReturnValueOnce(
-      makeSessionsFetch([makeSession({ mood_tags: ['dark', 'hypnotic', 'ambient', 'lo-fi', 'noisy'] })]) as never,
-    )
+  it('shows all mood tags on card', async () => {
+    const session = makeSession({ mood_tags: ['dark', 'hypnotic', 'ambient', 'lo-fi', 'noisy'] })
+    mockFrom
+      .mockReturnValueOnce(makeSessionsFetch([session]) as never)
+      .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
     renderSessions()
     expect(await screen.findByText('dark')).toBeInTheDocument()
     expect(screen.getByText('hypnotic')).toBeInTheDocument()
     expect(screen.getByText('ambient')).toBeInTheDocument()
-    expect(screen.queryByText('lo-fi')).not.toBeInTheDocument()
-    expect(screen.getByText('+2 more')).toBeInTheDocument()
+    expect(screen.getAllByText('lo-fi').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('noisy').length).toBeGreaterThan(0)
   })
 
-  it('shows BPM badge and key/scale on card when set', async () => {
-    mockFrom.mockReturnValueOnce(
-      makeSessionsFetch([makeSession({ bpm: 120, key_scale: 'A minor' })]) as never,
-    )
+  it('shows BPM and key/scale on card when set', async () => {
+    const session = makeSession({ bpm: 120, key_scale: 'A minor' })
+    mockFrom
+      .mockReturnValueOnce(makeSessionsFetch([session]) as never)
+      .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
     renderSessions()
-    expect(await screen.findByText('120 BPM')).toBeInTheDocument()
-    expect(screen.getByText('A minor')).toBeInTheDocument()
+    expect((await screen.findAllByText('120')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/A minor/).length).toBeGreaterThan(0)
   })
 
   it('renders a session card with title and relative date', async () => {
-    mockFrom.mockReturnValueOnce(makeSessionsFetch([makeSession()]) as never)
+    const session = makeSession()
+    mockFrom
+      .mockReturnValueOnce(makeSessionsFetch([session]) as never)
+      .mockReturnValueOnce(makeActiveSessionFetch(session) as never)
     renderSessions()
     expect(await screen.findByText('Late night jam')).toBeInTheDocument()
-    expect(screen.getByText('3 days ago')).toBeInTheDocument()
+    expect(screen.getByText('3d ago')).toBeInTheDocument()
   })
 
   it('shows empty state when there are no sessions', async () => {

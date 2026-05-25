@@ -2,9 +2,17 @@ import { useEffect } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { useAuthStore } from './store/auth'
+import { useThemeStore } from './store/theme'
 import { router } from './router'
-
 import { ToastContainer } from './components/Toast'
+
+function ThemeSync() {
+  const theme = useThemeStore((s) => s.theme)
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
+  return null
+}
 
 export default function App() {
   const setUser = useAuthStore((s) => s.setUser)
@@ -18,9 +26,10 @@ export default function App() {
   }, [setUser])
 
   return (
-    <div className="bg-zinc-950 min-h-screen">
+    <>
+      <ThemeSync />
       <RouterProvider router={router} />
       <ToastContainer />
-    </div>
+    </>
   )
 }

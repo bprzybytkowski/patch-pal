@@ -1,0 +1,26 @@
+export const MOOD_COLOR: Record<'light' | 'dark', Record<string, string>> = {
+  light: {
+    dark:         '#bfb6e0',
+    hypnotic:     '#a3d6c0',
+    ambient:      '#cfe2c0',
+    playful:      '#f5c4d4',
+    broken:       '#e6b8a0',
+    noisy:        '#e8d77a',
+    experimental: '#c0d4ef',
+    melancholic:  '#b8c4ce',
+    energetic:    '#f5a890',
+    'lo-fi':      '#d6c4a3',
+  },
+  dark: {
+    dark:         '#6c63a0',
+    hypnotic:     '#5a8e7a',
+    ambient:      '#6a8a5a',
+    playful:      '#a06a82',
+    broken:       '#9c6a4e',
+    noisy:        '#a89348',
+    experimental: '#6a85b0',
+    melancholic:  '#67768a',
+    energetic:    '#a86048',
+    'lo-fi':      '#8a7a4f',
+  },
+}

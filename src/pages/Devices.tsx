@@ -13,6 +13,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
 import { usePostHog } from '@posthog/react'
+import { useThemeStore } from '../store/theme'
 
 export type DeviceType =
   | 'pocket_operator'
@@ -35,42 +36,37 @@ export interface Device {
 
 export const DEVICE_TYPE_LABELS: Record<DeviceType, string> = {
   pocket_operator: 'Pocket Operator',
-  analog_synth: 'Analog synth',
-  digital_synth: 'Digital synth',
-  drum_machine: 'Drum machine',
-  sampler: 'Sampler',
-  effects_unit: 'Effects unit',
-  other: 'Other',
+  analog_synth:   'Analog synth',
+  digital_synth:  'Digital synth',
+  drum_machine:   'Drum machine',
+  sampler:        'Sampler',
+  effects_unit:   'Effects unit',
+  other:          'Other',
 }
 
 export const DEVICE_TYPE_BADGE: Record<DeviceType, string> = {
   pocket_operator: 'bg-indigo-900 text-indigo-300',
-  analog_synth: 'bg-amber-900 text-amber-300',
-  digital_synth: 'bg-cyan-900 text-cyan-300',
-  drum_machine: 'bg-rose-900 text-rose-300',
-  sampler: 'bg-violet-900 text-violet-300',
-  effects_unit: 'bg-green-900 text-green-300',
-  other: 'bg-zinc-800 text-zinc-400',
+  analog_synth:    'bg-amber-900 text-amber-300',
+  digital_synth:   'bg-cyan-900 text-cyan-300',
+  drum_machine:    'bg-rose-900 text-rose-300',
+  sampler:         'bg-violet-900 text-violet-300',
+  effects_unit:    'bg-green-900 text-green-300',
+  other:           'bg-zinc-800 text-zinc-400',
 }
 
 export const DEVICE_ICONS: Record<DeviceType, LucideIcon> = {
   pocket_operator: Cpu,
-  analog_synth: Sliders,
-  digital_synth: Zap,
-  drum_machine: Music2,
-  sampler: Scissors,
-  effects_unit: Wand2,
-  other: Box,
+  analog_synth:    Sliders,
+  digital_synth:   Zap,
+  drum_machine:    Music2,
+  sampler:         Scissors,
+  effects_unit:    Wand2,
+  other:           Box,
 }
 
 const DEVICE_TYPES: DeviceType[] = [
-  'pocket_operator',
-  'analog_synth',
-  'digital_synth',
-  'drum_machine',
-  'sampler',
-  'effects_unit',
-  'other',
+  'pocket_operator', 'analog_synth', 'digital_synth', 'drum_machine',
+  'sampler', 'effects_unit', 'other',
 ]
 
 interface FormValues {
@@ -80,55 +76,82 @@ interface FormValues {
   notes: string
 }
 
-function TypeBadge({ type }: { type: DeviceType }) {
-  const Icon = DEVICE_ICONS[type]
-  return (
-    <span
-      data-testid="type-badge"
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${DEVICE_TYPE_BADGE[type]}`}
-    >
-      <Icon size={12} />
-      {DEVICE_TYPE_LABELS[type]}
-    </span>
-  )
-}
-
 function DeviceCard({
   device,
+  isFirst,
   onEdit,
   onDelete,
 }: {
   device: Device
+  isFirst: boolean
   onEdit: (device: Device) => void
   onDelete: (id: string) => void
 }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex items-start justify-between gap-4">
-      <div className="flex flex-col gap-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-zinc-100 text-sm font-medium">{device.name}</span>
-          <TypeBadge type={device.type} />
+    <div
+      className="relative rounded-[2px] p-[14px_16px_16px]"
+      style={{
+        background: 'rgb(var(--card-active))',
+        border: '1px solid rgb(var(--ink))',
+        boxShadow: '3px 3px 0 rgba(var(--ink)/0.2)',
+      }}
+    >
+      {isFirst && (
+        <span
+          style={{
+            position: 'absolute',
+            top: -8,
+            left: 16,
+            width: 70,
+            height: 16,
+            background: 'rgba(244,211,94,0.85)',
+            borderLeft: '1px solid rgba(120,90,30,0.15)',
+            borderRight: '1px solid rgba(120,90,30,0.15)',
+            boxShadow: '0 1px 2px rgba(40,30,10,0.18)',
+            transform: 'rotate(-2deg)',
+          }}
+        />
+      )}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="font-serif font-semibold text-[18px] text-ink leading-tight">
+            {device.name}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-muted">
+              {DEVICE_TYPE_LABELS[device.type]}
+            </span>
+            {device.manufacturer && (
+              <>
+                <span className="text-rule">·</span>
+                <span className="font-mono text-[10px] tracking-[0.12em] text-ink-muted">
+                  {device.manufacturer}
+                </span>
+              </>
+            )}
+          </div>
+          {device.notes && (
+            <span className="font-serif italic text-[13px] text-ink-soft mt-1">
+              {device.notes}
+            </span>
+          )}
         </div>
-        {device.manufacturer && (
-          <span className="text-zinc-400 text-xs">{device.manufacturer}</span>
-        )}
-        {device.notes && (
-          <span className="text-zinc-500 text-xs">{device.notes}</span>
-        )}
-      </div>
-      <div className="flex gap-2 shrink-0">
-        <button
-          onClick={() => onEdit(device)}
-          className="text-zinc-400 hover:text-zinc-100 text-sm"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => onDelete(device.id)}
-          className="text-red-400 hover:text-red-300 text-sm"
-        >
-          Delete
-        </button>
+        <div className="flex gap-3 shrink-0 items-start">
+          <button
+            onClick={() => onEdit(device)}
+            className="font-serif italic text-[14px] text-ink-soft underline cursor-pointer"
+            style={{ background: 'none', border: 'none' }}
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => onDelete(device.id)}
+            className="font-serif italic text-[14px] text-accent underline cursor-pointer"
+            style={{ background: 'none', border: 'none' }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -152,33 +175,71 @@ function EditCard({
     },
   })
 
+  const fieldStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '1.5px solid rgb(var(--ink))',
+    padding: '6px 0',
+    fontFamily: '"Spectral", serif',
+    fontStyle: 'italic',
+    fontSize: 16,
+    color: 'rgb(var(--ink))',
+    outline: 'none',
+    width: '100%',
+  }
+
   return (
     <form
       onSubmit={handleSubmit(onSave)}
-      className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex flex-col gap-3"
+      className="flex flex-col gap-4 p-[14px_16px_16px] rounded-[2px]"
+      style={{
+        background: 'rgb(var(--card-active))',
+        border: '1px solid rgb(var(--ink))',
+        boxShadow: '3px 3px 0 rgba(var(--ink)/0.2)',
+      }}
     >
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`edit-name-${device.id}`} className="text-xs text-zinc-400">Name</label>
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor={`edit-name-${device.id}`}
+          className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted"
+        >
+          Name
+        </label>
         <input
           id={`edit-name-${device.id}`}
-          className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          style={fieldStyle}
           {...register('name', { required: true })}
         />
       </div>
-      <div className="flex gap-2 mt-1">
+      <div className="flex items-center gap-3 pt-2 border-t border-dashed border-rule">
         <button
           type="submit"
           disabled={isSubmitting}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50"
+          style={{
+            background: 'rgb(var(--btn-bg))',
+            color: 'rgb(var(--btn-text))',
+            padding: '8px 14px',
+            fontFamily: '"JetBrains Mono", monospace',
+            fontSize: 10,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            boxShadow: '2px 2px 0 rgb(var(--accent))',
+            borderRadius: 2,
+            border: 'none',
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            opacity: isSubmitting ? 0.5 : 1,
+          }}
         >
           Save
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="text-zinc-400 hover:text-zinc-100 text-sm px-3 py-1.5"
+          className="font-serif italic text-[14px] text-ink-soft underline"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          Cancel
+          cancel
         </button>
       </div>
     </form>
@@ -188,13 +249,15 @@ function EditCard({
 export default function DevicesPage() {
   const user = useAuthStore((s) => s.user)
   const posthog = usePostHog()
+  const theme = useThemeStore((s) => s.theme)
   const [devices, setDevices] = useState<Device[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [addError, setAddError] = useState('')
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     defaultValues: { name: '', type: 'pocket_operator', manufacturer: '', notes: '' },
   })
+  const selectedType = watch('type')
 
   useEffect(() => {
     supabase
@@ -251,65 +314,163 @@ export default function DevicesPage() {
     setDevices((prev) => prev.filter((d) => d.id !== id))
   }
 
+  const fieldStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '1.5px solid rgb(var(--ink))',
+    padding: '6px 0',
+    fontFamily: '"Spectral", serif',
+    fontStyle: 'italic',
+    fontSize: 16,
+    color: 'rgb(var(--ink))',
+    outline: 'none',
+    width: '100%',
+  }
+
   return (
-    <div data-testid="devices-page" className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-zinc-100 text-lg font-medium mb-6">My gear</h1>
-
-      <form onSubmit={handleAdd} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-6 flex flex-col gap-3">
-        <h2 className="text-zinc-100 text-sm font-medium">Add device</h2>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="name" className="text-xs text-zinc-400">Name</label>
-          <input
-            id="name"
-            className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            {...register('name', { required: 'Name is required' })}
-          />
-          {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="type" className="text-xs text-zinc-400">Type</label>
-          <select
-            id="type"
-            className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            {...register('type', { required: true })}
+    <div data-testid="devices-page" className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">
+      {/* Add device form */}
+      <div
+        className="rounded-[4px] p-[28px_30px_28px] mb-8"
+        style={{
+          background: 'linear-gradient(180deg, #fffaee 0%, #faf0d8 100%)',
+          boxShadow: theme === 'dark'
+            ? '0 1px 0 rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.4)'
+            : '0 1px 0 rgba(40,30,10,0.05), 0 10px 24px rgba(80,55,20,0.12)',
+          border: '1px solid rgb(var(--rule-soft))',
+        }}
+      >
+        <form onSubmit={handleAdd} className="flex flex-col gap-5">
+          <h2
+            className="font-serif font-semibold text-ink"
+            style={{ fontSize: 24, letterSpacing: '-0.01em', lineHeight: 1 }}
           >
-            {DEVICE_TYPES.map((t) => (
-              <option key={t} value={t}>{DEVICE_TYPE_LABELS[t]}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="manufacturer" className="text-xs text-zinc-400">Manufacturer</label>
-          <input
-            id="manufacturer"
-            className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            {...register('manufacturer')}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="notes" className="text-xs text-zinc-400">Notes</label>
-          <textarea
-            id="notes"
-            rows={2}
-            className="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-            {...register('notes')}
-          />
-        </div>
-        {addError && <p className="text-xs text-red-400">{addError}</p>}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium self-start disabled:opacity-50"
-        >
-          Add device
-        </button>
-      </form>
+            Add device
+          </h2>
 
-      <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="name" className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">
+              Name
+            </label>
+            <input
+              id="name"
+              style={fieldStyle}
+              {...register('name', { required: 'Name is required' })}
+            />
+            {errors.name && (
+              <p className="font-serif italic text-[14px] text-accent">{errors.name.message}</p>
+            )}
+          </div>
+
+          {/* Type grid */}
+          <div className="flex flex-col gap-1.5">
+            <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">
+              Type
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {DEVICE_TYPES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setValue('type', t)}
+                  style={{
+                    fontFamily: '"JetBrains Mono", monospace',
+                    fontSize: 10,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    padding: '8px 12px',
+                    borderRadius: 2,
+                    border: '1.5px solid',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    ...(selectedType === t
+                      ? {
+                          background: 'rgba(244,211,94,0.85)',
+                          borderColor: 'rgb(var(--ink))',
+                          color: 'rgb(var(--ink))',
+                          fontWeight: 700,
+                        }
+                      : {
+                          background: 'transparent',
+                          borderColor: 'rgb(var(--ink))',
+                          borderStyle: 'dashed',
+                          color: 'rgb(var(--ink-muted))',
+                          opacity: 0.6,
+                        }),
+                  }}
+                >
+                  {DEVICE_TYPE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="manufacturer"
+              className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted"
+            >
+              Manufacturer
+            </label>
+            <input id="manufacturer" style={fieldStyle} {...register('manufacturer')} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="dev-notes" className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">
+              Notes
+            </label>
+            <textarea
+              id="dev-notes"
+              rows={2}
+              style={{ ...fieldStyle, resize: 'none' }}
+              {...register('notes')}
+            />
+          </div>
+
+          {addError && (
+            <p className="font-serif italic text-[14px] text-accent">{addError}</p>
+          )}
+
+          <div className="pt-2 border-t border-dashed border-rule">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              style={{
+                background: 'rgb(var(--btn-bg))',
+                color: 'rgb(var(--btn-text))',
+                padding: '10px 18px',
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 11,
+                letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                fontWeight: 700,
+                boxShadow: '3px 3px 0 rgb(var(--accent))',
+                borderRadius: 2,
+                border: 'none',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.5 : 1,
+              }}
+            >
+              Add device
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Device list */}
+      <div
+        className="flex items-center gap-2.5 font-mono text-[10px] tracking-[0.28em] uppercase text-ink-muted mb-4"
+      >
+        <span>My gear</span>
+        <span className="flex-1 h-px bg-rule" />
+        <span>{devices.length} items</span>
+      </div>
+
+      <div className="flex flex-col gap-4">
         {devices.length === 0 && (
-          <p className="text-zinc-500 text-sm">No devices yet.</p>
+          <p className="font-serif italic text-[14px] text-ink-muted">No devices yet.</p>
         )}
-        {devices.map((device) =>
+        {devices.map((device, i) =>
           editingId === device.id ? (
             <EditCard
               key={device.id}
@@ -321,6 +482,7 @@ export default function DevicesPage() {
             <DeviceCard
               key={device.id}
               device={device}
+              isFirst={i === 0}
               onEdit={(d) => setEditingId(d.id)}
               onDelete={handleDelete}
             />

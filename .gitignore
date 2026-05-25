@@ -28,3 +28,6 @@ dist-ssr
 
 # Setup reports
 posthog-setup-report.md
+
+# Design handoffs
+.design/
