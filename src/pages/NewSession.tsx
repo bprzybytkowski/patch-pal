@@ -376,7 +376,7 @@ function ConnectionsSection({
   const toOptions = [...deviceNames, 'OUT']
 
   const confirmAdd = () => {
-    if (!draft.fromName || !draft.toName || !draft.label.trim()) return
+    if (!draft.fromName || !draft.toName) return
     onAdd({ ...draft, label: draft.label.trim() })
     setDraft({ fromName: deviceNames[0] ?? '', toName: deviceNames[1] ?? '', kind: 'audio', label: '' })
     setAdding(false)
@@ -517,7 +517,7 @@ function ConnectionsSection({
             <button
               type="button"
               onClick={confirmAdd}
-              disabled={!draft.label.trim() || draft.fromName === draft.toName}
+              disabled={draft.fromName === draft.toName}
               style={{
                 fontFamily: '"JetBrains Mono", monospace',
                 fontSize: 10,
@@ -530,7 +530,7 @@ function ConnectionsSection({
                 background: 'rgb(var(--ink))',
                 color: 'rgb(var(--paper))',
                 cursor: 'pointer',
-                opacity: (!draft.label.trim() || draft.fromName === draft.toName) ? 0.4 : 1,
+                opacity: draft.fromName === draft.toName ? 0.4 : 1,
               }}
             >
               Add cable

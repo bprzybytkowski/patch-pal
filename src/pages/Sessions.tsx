@@ -39,6 +39,7 @@ interface Session {
   notes: string | null
   ableton_project: string | null
   forked_from: string | null
+  version: number
   created_at: string
   session_devices: SessionDeviceRow[]
   session_connections?: SessionConnection[]
@@ -157,7 +158,7 @@ function SessionDetailPanel({
           transformOrigin: 'top right',
         }}
       >
-        Take · 01
+        Take · {String(session.version ?? 1).padStart(2, '0')}
       </div>
 
       {/* Title */}
@@ -486,32 +487,8 @@ export default function SessionsPage() {
 
   const handleFork = () => {
     if (!activeSession) return
-    posthog.capture('session_forked', { source_session_id: activeSession.id })
-    navigate('/sessions/new', {
-      state: {
-        forkedFrom: activeSession.id,
-        prefill: {
-          title: activeSession.title,
-          bpm: activeSession.bpm?.toString() ?? '',
-          key_scale: activeSession.key_scale ?? '',
-          ableton_project: activeSession.ableton_project ?? '',
-          notes: activeSession.notes ?? '',
-          mood_tags: activeSession.mood_tags,
-          devices: activeSession.session_devices.map((sd) => ({
-            deviceId: sd.device_id,
-            syncRole: sd.sync_role,
-            syncMode: sd.sync_mode ?? '',
-            patchNotes: sd.patch_notes ?? '',
-          })),
-          connections: (activeSession.session_connections ?? []).map((c) => ({
-            fromName: c.from_name,
-            toName: c.to_name,
-            kind: c.kind,
-            label: c.label,
-          })),
-        },
-      },
-    })
+    posthog.capture('session_continued', { session_id: activeSession.id })
+    navigate(`/sessions/${activeSession.id}`, { state: { continueTake: true } })
   }
 
   const handleDelete = async () => {

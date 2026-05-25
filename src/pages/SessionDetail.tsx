@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
 import { DEVICE_TYPE_LABELS, type DeviceType } from './Devices'
@@ -45,6 +45,7 @@ interface Session {
   notes: string | null
   ableton_project: string | null
   forked_from: string | null
+  version: number
   created_at: string
   session_devices: SessionDeviceRow[]
   session_connections: SessionConnection[]
@@ -159,6 +160,7 @@ const fieldInputStyle: React.CSSProperties = {
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const posthog = usePostHog()
   const theme = useThemeStore((s) => s.theme)
   const isMobile = useMediaQuery('(max-width: 640px)')
@@ -166,6 +168,7 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<Session | null>(null)
   const [parentTitle, setParentTitle] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  const [isContinue, setIsContinue] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [editConnections, setEditConnections] = useState<{ fromName: string; toName: string; kind: CableKind; label: string }[]>([])
@@ -208,7 +211,7 @@ export default function SessionDetailPage() {
       })
   }, [id])
 
-  const startEdit = () => {
+  const startEdit = (continueMode = false) => {
     if (!session) return
     reset({
       title: session.title,
@@ -226,16 +229,27 @@ export default function SessionDetailPage() {
         label: c.label,
       })),
     )
+    setIsContinue(continueMode)
     setEditing(true)
   }
 
   const cancelEdit = () => {
     setTags(session?.mood_tags ?? [])
     setEditConnections([])
+    setIsContinue(false)
     setEditing(false)
   }
 
+  useEffect(() => {
+    if (session && (location.state as { continueTake?: boolean } | null)?.continueTake) {
+      startEdit(true)
+      window.history.replaceState({}, '')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session])
+
   const onSave = handleSubmit(async (values) => {
+    const nextVersion = isContinue ? (session?.version ?? 1) + 1 : (session?.version ?? 1)
     const { data } = await supabase
       .from('sessions')
       .update({
@@ -245,6 +259,7 @@ export default function SessionDetailPage() {
         ableton_project: values.ableton_project.trim() || null,
         notes: values.notes.trim() || null,
         mood_tags: tags,
+        version: nextVersion,
       })
       .eq('id', id)
       .select()
@@ -292,34 +307,9 @@ export default function SessionDetailPage() {
     navigate('/sessions')
   }
 
-  const handleFork = () => {
-    if (!session) return
-    posthog.capture('session_forked', { source_session_id: session.id })
-    navigate('/sessions/new', {
-      state: {
-        forkedFrom: session.id,
-        prefill: {
-          title: session.title,
-          bpm: session.bpm?.toString() ?? '',
-          key_scale: session.key_scale ?? '',
-          ableton_project: session.ableton_project ?? '',
-          notes: session.notes ?? '',
-          mood_tags: session.mood_tags,
-          devices: session.session_devices.map((sd) => ({
-            deviceId: sd.device_id,
-            syncRole: sd.sync_role,
-            syncMode: sd.sync_mode ?? '',
-            patchNotes: sd.patch_notes ?? '',
-          })),
-          connections: (session.session_connections ?? []).map((c) => ({
-            fromName: c.from_name,
-            toName: c.to_name,
-            kind: c.kind,
-            label: c.label,
-          })),
-        },
-      },
-    })
+  const handleContinue = () => {
+    posthog.capture('session_continued', { session_id: id })
+    startEdit(true)
   }
 
   if (!session) return null
@@ -362,7 +352,7 @@ export default function SessionDetailPage() {
         {editing ? (
           <form onSubmit={onSave} className="flex flex-col gap-5">
             <h2 className="font-serif font-semibold text-[24px] text-ink leading-tight">
-              Edit session
+              {isContinue ? 'Continue this take' : 'Edit session'}
             </h2>
 
             <FieldInput label="Title" id="title">
@@ -502,7 +492,7 @@ export default function SessionDetailPage() {
                   cursor: 'pointer',
                 }}
               >
-                Save changes
+                {isContinue ? 'Save take' : 'Save changes'}
               </button>
               <button
                 type="button"
@@ -535,7 +525,7 @@ export default function SessionDetailPage() {
                 transformOrigin: 'top right',
               }}
             >
-              Take · 01
+              Take · {String(session.version ?? 1).padStart(2, '0')}
             </div>
 
             {/* Title */}
@@ -689,7 +679,7 @@ export default function SessionDetailPage() {
             {/* Footer actions */}
             <div className="flex items-center gap-3.5 pt-2 border-t border-dashed border-rule flex-wrap">
               <button
-                onClick={handleFork}
+                onClick={handleContinue}
                 style={{
                   background: 'rgb(var(--btn-bg))',
                   color: 'rgb(var(--btn-text))',
@@ -760,7 +750,7 @@ function EditConnectionsSection({
   const toOptions = [...deviceNames, 'OUT']
 
   const confirmAdd = () => {
-    if (!draft.fromName || !draft.toName || !draft.label.trim()) return
+    if (!draft.fromName || !draft.toName) return
     onAdd({ ...draft, label: draft.label.trim() })
     setDraft({ fromName: deviceNames[0] ?? '', toName: deviceNames[1] ?? '', kind: 'audio', label: '' })
     setAdding(false)
@@ -901,7 +891,7 @@ function EditConnectionsSection({
             <button
               type="button"
               onClick={confirmAdd}
-              disabled={!draft.label.trim() || draft.fromName === draft.toName}
+              disabled={draft.fromName === draft.toName}
               style={{
                 fontFamily: '"JetBrains Mono", monospace',
                 fontSize: 10,
@@ -914,7 +904,7 @@ function EditConnectionsSection({
                 background: 'rgb(var(--ink))',
                 color: 'rgb(var(--paper))',
                 cursor: 'pointer',
-                opacity: (!draft.label.trim() || draft.fromName === draft.toName) ? 0.4 : 1,
+                opacity: draft.fromName === draft.toName ? 0.4 : 1,
               }}
             >
               Add cable
