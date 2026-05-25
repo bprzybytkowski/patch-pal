@@ -408,10 +408,16 @@ function SessionCard({
           }}
         />
       )}
-      <div
-        className="absolute top-3.5 right-3.5 font-mono text-[9px] tracking-[0.18em] uppercase text-ink-muted"
-      >
-        {formatRelative(session.created_at)}
+      <div className="absolute top-3.5 right-3.5 text-right">
+        <div className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink-muted">
+          {formatRelative(session.created_at)}
+        </div>
+        <div
+          className="font-mono text-[8px] tracking-[0.2em] uppercase font-bold mt-0.5"
+          style={{ color: 'rgb(var(--accent))' }}
+        >
+          Take · {String(session.version ?? 1).padStart(2, '0')}
+        </div>
       </div>
 
       <div className="font-serif font-semibold text-[18px] text-ink leading-[1.2] mt-0.5">
