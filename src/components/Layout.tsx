@@ -41,13 +41,15 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
         style={{
           position: 'relative',
           zIndex: 1,
-          padding: compact ? '5px 8px' : '6px 10px',
+          flex: 1,
+          padding: compact ? '5px 10px' : '6px 14px',
           background: 'transparent',
           color: !isDark ? 'rgb(var(--paper))' : 'rgb(var(--ink-soft))',
           transition: 'color 180ms ease',
           border: 'none',
           outline: 'none',
           cursor: 'pointer',
+          whiteSpace: 'nowrap',
         }}
       >
         {compact ? '☼' : '☼ Paper'}
@@ -58,13 +60,15 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
         style={{
           position: 'relative',
           zIndex: 1,
-          padding: compact ? '5px 8px' : '6px 10px',
+          flex: 1,
+          padding: compact ? '5px 10px' : '6px 14px',
           background: 'transparent',
           color: isDark ? 'rgb(var(--paper))' : 'rgb(var(--ink-soft))',
           transition: 'color 180ms ease',
           border: 'none',
           outline: 'none',
           cursor: 'pointer',
+          whiteSpace: 'nowrap',
         }}
       >
         {compact ? '☾' : '☾ Ink'}
