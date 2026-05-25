@@ -171,6 +171,12 @@ function DeviceRow({
   )
 }
 
+function defaultLabel(conn: SignalFlowConnection): string {
+  if (conn.label) return conn.label
+  if (conn.kind === 'sync') return 'sync'
+  return conn.label
+}
+
 function CableConnector({
   conn,
   theme,
@@ -179,6 +185,7 @@ function CableConnector({
   theme: 'light' | 'dark'
 }) {
   const style = CABLE_KIND_STYLE[theme][conn.kind] ?? CABLE_KIND_STYLE[theme].midi
+  const label = defaultLabel(conn)
   return (
     <div
       style={{
@@ -250,7 +257,7 @@ function CableConnector({
           {style.label}
         </span>
         <span style={{ opacity: 0.4 }}>·</span>
-        <span>{conn.label}</span>
+        <span>{label}</span>
       </div>
     </div>
   )
@@ -296,7 +303,7 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
   const STEP = ROW_H + GAP_H
   const LANE_W = 24
   const labelWidthFor = (l: string) => l.length * 5.5 + 14
-  const maxLabelW = bypass.length ? Math.max(...bypass.map((b) => labelWidthFor(b.conn.label))) : 0
+  const maxLabelW = bypass.length ? Math.max(...bypass.map((b) => labelWidthFor(defaultLabel(b.conn)))) : 0
   const lanesW = bypass.length * LANE_W
   const svgW = lanesW + maxLabelW + 24
   const paddingR = bypass.length > 0 ? svgW + 8 : 0
@@ -370,7 +377,8 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
             const yFrom = fromIdx * STEP + ROW_H / 2
             const yTo = toIdx * STEP + ROW_H / 2
             const path = `M 0 ${yFrom} L ${laneX - 6} ${yFrom} Q ${laneX} ${yFrom}, ${laneX} ${yFrom + 8} L ${laneX} ${yTo - 8} Q ${laneX} ${yTo}, ${laneX - 6} ${yTo} L 0 ${yTo}`
-            const lw = labelWidthFor(conn.label)
+            const connLabel = defaultLabel(conn)
+            const lw = labelWidthFor(connLabel)
             return (
               <g key={i}>
                 <path
@@ -408,7 +416,7 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
                     fontSize="9"
                     fill={style.stroke}
                   >
-                    {conn.label}
+                    {connLabel}
                   </text>
                 </g>
               </g>
