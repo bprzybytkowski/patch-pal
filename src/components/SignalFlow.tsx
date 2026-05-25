@@ -271,7 +271,6 @@ interface Props {
 }
 
 export default function SignalFlow({ devices, connections, theme, compact = false }: Props) {
-  const T = SF_THEME[theme]
   const kindStyles = CABLE_KIND_STYLE[theme]
   const ordered = orderDevicesForFlow(devices)
   const orderIdx = (name: string) => ordered.findIndex((d) => d.name === name)
