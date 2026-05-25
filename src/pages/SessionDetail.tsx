@@ -531,6 +531,14 @@ export default function SessionDetailPage() {
               >
                 save changes
               </button>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="font-serif italic text-[14px] text-ink-muted underline"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                cancel
+              </button>
             </div>
           </form>
         ) : (
