@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
 import { DEVICE_TYPE_LABELS, type DeviceType } from './Devices'
@@ -170,7 +170,6 @@ export default function SessionDetailPage() {
   const user = useAuthStore((s) => s.user)
 
   const [session, setSession] = useState<Session | null>(null)
-  const [parentTitle, setParentTitle] = useState<string | null>(null)
   const [nextTakeId, setNextTakeId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
@@ -203,16 +202,6 @@ export default function SessionDetailPage() {
         setSession(s)
         setTags(s.mood_tags)
         setNextTakeId(null)
-        if (s.forked_from) {
-          supabase
-            .from('sessions')
-            .select('id, title')
-            .eq('id', s.forked_from)
-            .single()
-            .then(({ data: parent }) => {
-              if (parent) setParentTitle((parent as { title: string }).title)
-            })
-        }
         supabase
           .from('sessions')
           .select('id')
@@ -368,15 +357,6 @@ export default function SessionDetailPage() {
 
   return (
     <div className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">
-      {session.forked_from && parentTitle && (
-        <Link
-          to={`/sessions/${session.forked_from}`}
-          className="inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.18em] uppercase text-ink-soft mb-6"
-        >
-          ← Continued from: <span className="text-ink ml-1">{parentTitle}</span>
-        </Link>
-      )}
-
       {/* Cream paper card */}
       <div
         className="rounded-[4px] p-[28px_30px_28px] sm:p-[36px_38px_32px] overflow-hidden relative"
@@ -427,7 +407,6 @@ export default function SessionDetailPage() {
                   letterSpacing: '0.16em',
                   color: 'rgb(var(--ink-muted))',
                   padding: 0,
-                  marginRight: editing ? 0 : 68,
                 }}
               >
                 next take →
