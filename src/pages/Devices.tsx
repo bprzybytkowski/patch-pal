@@ -166,7 +166,7 @@ function EditCard({
   onSave: (values: FormValues) => Promise<void>
   onCancel: () => void
 }) {
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, setValue, watch, formState: { isSubmitting } } = useForm<FormValues>({
     defaultValues: {
       name: device.name,
       type: device.type,
@@ -174,6 +174,7 @@ function EditCard({
       notes: device.notes ?? '',
     },
   })
+  const selectedType = watch('type')
 
   const fieldStyle: React.CSSProperties = {
     background: 'transparent',
@@ -211,6 +212,78 @@ function EditCard({
           {...register('name', { required: true })}
         />
       </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">
+          Type
+        </span>
+        <div className="grid grid-cols-2 gap-1.5">
+          {DEVICE_TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setValue('type', t)}
+              style={{
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 10,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                padding: '8px 12px',
+                borderRadius: 2,
+                border: '1.5px solid',
+                cursor: 'pointer',
+                textAlign: 'left',
+                ...(selectedType === t
+                  ? {
+                      background: 'rgba(244,211,94,0.85)',
+                      borderColor: 'rgb(var(--ink))',
+                      color: 'rgb(var(--ink))',
+                      fontWeight: 700,
+                    }
+                  : {
+                      background: 'transparent',
+                      borderColor: 'rgb(var(--ink))',
+                      borderStyle: 'dashed',
+                      color: 'rgb(var(--ink-muted))',
+                      opacity: 0.6,
+                    }),
+              }}
+            >
+              {DEVICE_TYPE_LABELS[t]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor={`edit-manufacturer-${device.id}`}
+          className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted"
+        >
+          Manufacturer
+        </label>
+        <input
+          id={`edit-manufacturer-${device.id}`}
+          style={fieldStyle}
+          {...register('manufacturer')}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor={`edit-notes-${device.id}`}
+          className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted"
+        >
+          Notes
+        </label>
+        <textarea
+          id={`edit-notes-${device.id}`}
+          rows={2}
+          style={{ ...fieldStyle, resize: 'none' }}
+          {...register('notes')}
+        />
+      </div>
+
       <div className="flex items-center gap-3 pt-2 border-t border-dashed border-rule">
         <button
           type="submit"
