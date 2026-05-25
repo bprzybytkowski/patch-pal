@@ -699,7 +699,7 @@ export default function SessionDetailPage() {
                 Continue this take →
               </button>
               <button
-                onClick={startEdit}
+                onClick={() => startEdit()}
                 className="font-serif italic text-[14px] text-ink-soft underline"
                 style={{ background: 'none', border: 'none', cursor: 'pointer' }}
               >
