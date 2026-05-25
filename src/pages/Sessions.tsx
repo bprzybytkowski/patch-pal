@@ -116,11 +116,15 @@ function SessionDetailPanel({
   theme,
   onDelete,
   onEdit,
+  onPrevTake,
+  onNextTake,
 }: {
   session: Session
   theme: 'light' | 'dark'
   onDelete: () => void
   onEdit: () => void
+  onPrevTake: (() => void) | null
+  onNextTake: (() => void) | null
 }) {
   const isMobile = useMediaQuery('(max-width: 640px)')
   const connections: SignalFlowConnection[] = (session.session_connections ?? []).map((c) => ({
@@ -136,8 +140,30 @@ function SessionDetailPanel({
     sync: sd.sync_mode,
   }))
 
+  const navBtnStyle: React.CSSProperties = {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: '"JetBrains Mono", monospace',
+    fontSize: 11,
+    letterSpacing: '0.16em',
+    color: 'rgb(var(--ink-muted))',
+    padding: '0 2px',
+    lineHeight: 1,
+  }
+
   return (
     <div className="relative flex flex-col gap-[22px] overflow-hidden">
+      {/* Take navigation */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: -8 }}>
+        {onPrevTake ? (
+          <button style={navBtnStyle} onClick={onPrevTake}>← prev take</button>
+        ) : <span />}
+        {onNextTake ? (
+          <button style={{ ...navBtnStyle, marginRight: 68 }} onClick={onNextTake}>next take →</button>
+        ) : <span />}
+      </div>
+
       {/* Page stamp */}
       <div
         style={{
@@ -617,6 +643,15 @@ export default function SessionsPage() {
                 theme={theme}
                 onDelete={handleDelete}
                 onEdit={handleEdit}
+                onPrevTake={
+                  activeSession.forked_from
+                    ? () => setActiveId(activeSession.forked_from!)
+                    : null
+                }
+                onNextTake={(() => {
+                  const child = sessions.find((s) => s.forked_from === activeSession.id)
+                  return child ? () => setActiveId(child.id) : null
+                })()}
               />
             </div>
           ) : (

@@ -171,6 +171,7 @@ export default function SessionDetailPage() {
 
   const [session, setSession] = useState<Session | null>(null)
   const [parentTitle, setParentTitle] = useState<string | null>(null)
+  const [nextTakeId, setNextTakeId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
@@ -201,6 +202,7 @@ export default function SessionDetailPage() {
         const s: Session = { ...(data as Session), session_connections: connData ?? [] }
         setSession(s)
         setTags(s.mood_tags)
+        setNextTakeId(null)
         if (s.forked_from) {
           supabase
             .from('sessions')
@@ -211,6 +213,14 @@ export default function SessionDetailPage() {
               if (parent) setParentTitle((parent as { title: string }).title)
             })
         }
+        supabase
+          .from('sessions')
+          .select('id')
+          .eq('forked_from', id!)
+          .maybeSingle()
+          .then(({ data: child }) => {
+            if (child) setNextTakeId((child as { id: string }).id)
+          })
       })
   }, [id])
 
@@ -378,6 +388,54 @@ export default function SessionDetailPage() {
           border: '1px solid rgb(var(--rule-soft))',
         }}
       >
+        {/* Take navigation */}
+        {(session.forked_from || nextTakeId) && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 12,
+            }}
+          >
+            {session.forked_from ? (
+              <button
+                onClick={() => navigate(`/sessions/${session.forked_from}`)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: '"JetBrains Mono", monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  color: 'rgb(var(--ink-muted))',
+                  padding: 0,
+                }}
+              >
+                ← prev take
+              </button>
+            ) : <span />}
+            {nextTakeId ? (
+              <button
+                onClick={() => navigate(`/sessions/${nextTakeId}`)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: '"JetBrains Mono", monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  color: 'rgb(var(--ink-muted))',
+                  padding: 0,
+                  marginRight: editing ? 0 : 68,
+                }}
+              >
+                next take →
+              </button>
+            ) : <span />}
+          </div>
+        )}
+
         {editing ? (
           <form className="flex flex-col gap-5">
             <h2 className="font-serif font-semibold text-[24px] text-ink leading-tight">
