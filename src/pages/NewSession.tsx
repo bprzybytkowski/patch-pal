@@ -288,22 +288,30 @@ export default function NewSessionPage() {
             sessionDevices={sessionDevices}
             connections={sessionConnections}
             onAddDevice={(device) => {
-              const isFirst = sessionDevices.length === 0
+              const currentLastDeviceId = sessionDevices[sessionDevices.length - 1]?.deviceId
+              const currentLastDevice = currentLastDeviceId
+                ? devices.find((d) => d.id === currentLastDeviceId)
+                : null
               setSessionDevices((prev) => [
                 ...prev,
                 { deviceId: device.id, syncRole: 'standalone', syncMode: '', patchNotes: '' },
               ])
-              if (isFirst) {
-                setSessionConnections((prev) => {
-                  const hasOut = prev.some(
-                    (c) => c.fromName === device.name && c.toName === 'OUT' && c.kind === 'audio',
-                  )
-                  if (!hasOut) {
-                    return [...prev, { fromName: device.name, toName: 'OUT', kind: 'audio', label: '' }]
-                  }
-                  return prev
-                })
-              }
+              setSessionConnections((prev) => {
+                const lastHasOut = currentLastDevice
+                  ? prev.some(
+                      (c) => c.fromName === currentLastDevice.name && c.toName === 'OUT' && c.kind === 'audio',
+                    )
+                  : false
+                if (sessionDevices.length === 0 || lastHasOut) {
+                  const filtered = currentLastDevice
+                    ? prev.filter(
+                        (c) => !(c.fromName === currentLastDevice.name && c.toName === 'OUT' && c.kind === 'audio'),
+                      )
+                    : prev
+                  return [...filtered, { fromName: device.name, toName: 'OUT', kind: 'audio', label: '' }]
+                }
+                return prev
+              })
             }}
             onRemoveDevice={(idx) => {
               const removed = devices.find((d) => d.id === sessionDevices[idx].deviceId)
