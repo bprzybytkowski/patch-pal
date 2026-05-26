@@ -271,7 +271,7 @@ export default function SessionDetailPage() {
     const state = location.state as { editing?: boolean } | null
     if (state?.editing) {
       startEdit()
-      window.history.replaceState({}, '')
+      navigate(location.pathname, { replace: true, state: null })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session])
@@ -385,6 +385,7 @@ export default function SessionDetailPage() {
 
     posthog.capture('session_created', { session_id: newId, is_fork: true })
     setEditing(false)
+    setSession(null)
     navigate(`/sessions/${newId}`)
   })
 
