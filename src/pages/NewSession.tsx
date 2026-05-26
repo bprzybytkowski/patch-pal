@@ -256,7 +256,7 @@ export default function NewSessionPage() {
                       fontSize: 10,
                       letterSpacing: '0.06em',
                       textTransform: 'lowercase',
-                      color: theme === 'dark' ? 'rgb(var(--paper))' : 'rgb(var(--ink))',
+                      color: 'rgb(var(--ink))',
                       background: bg,
                       padding: '5px 10px 4px',
                       borderRadius: 12,
