@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useThemeStore } from '../store/theme'
+import { useMediaQuery } from '../lib/hooks'
 import { type CableKind } from './SignalFlow'
 
 const CABLE_KINDS: CableKind[] = ['audio', 'midi', 'sync']
@@ -13,6 +14,7 @@ interface Props {
 
 export function ConnectionTypeSheet({ pending, existingConnections, onConfirm, onCancel }: Props) {
   const theme = useThemeStore((s) => s.theme)
+  const isPhone = useMediaQuery('(max-width: 640px)')
 
   const usedKinds = new Set(
     existingConnections
@@ -81,7 +83,7 @@ export function ConnectionTypeSheet({ pending, existingConnections, onConfirm, o
           border: '1px solid rgb(var(--rule-soft))',
           borderBottom: 'none',
           borderRadius: '4px 4px 0 0',
-          padding: '20px 24px 40px',
+          padding: isPhone ? '20px 24px 72px' : '20px 24px 40px',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
