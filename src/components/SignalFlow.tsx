@@ -294,7 +294,6 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
 
   const ROW_H = compact ? 64 : 72
   const GAP_H = 56
-  const STEP = ROW_H + GAP_H
   const LANE_W = 24
   const labelWidthFor = (l: string) => l.length * 5.5 + 14
   const maxLabelW = bypass.length ? Math.max(...bypass.map((b) => labelWidthFor(defaultLabel(b.conn)))) : 0
@@ -302,10 +301,20 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
   const svgW = lanesW + maxLabelW + 24
   const paddingR = bypass.length > 0 ? svgW + 8 : 0
 
-  const totalRows = ordered.length
-  const outConnectorH = chainByGap['out'] ? GAP_H : 32
-  const outPillH = 40
-  const totalH = totalRows * ROW_H + (totalRows - 1) * (chainByGap ? GAP_H : 32) + outConnectorH + outPillH + 20
+  // Compute actual Y tops/centers based on real gap heights
+  const deviceTops: number[] = []
+  let _yAcc = 0
+  for (let i = 0; i < ordered.length; i++) {
+    deviceTops.push(_yAcc)
+    _yAcc += ROW_H
+    if (i < ordered.length - 1) _yAcc += chainByGap[i] ? GAP_H : 32
+  }
+  const outConnectorH = 40
+  const outPillH = 28
+  const outPillTop = _yAcc + outConnectorH
+  const deviceYCenter = (i: number) => deviceTops[i] + ROW_H / 2
+  const outPillYCenter = outPillTop + outPillH / 2
+  const totalH = outPillTop + outPillH + 16
 
   return (
     <div style={{ position: 'relative', paddingRight: paddingR }}>
@@ -328,21 +337,23 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
           </div>
         ))}
 
-        {chainByGap['out'] ? (
-          <CableConnector conn={chainByGap['out']} theme={theme} />
-        ) : (
-          <div style={{ position: 'relative', height: 36, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-            <svg
-              viewBox="0 0 60 36"
-              style={{ position: 'absolute', left: 'calc(50% - 30px)', width: 60, height: 36 }}
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <line x1="30" y1="0" x2="30" y2="26" stroke={kindStyles.audio.stroke} strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M22 22 L30 32 L38 22" fill="none" stroke={kindStyles.audio.stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="30" cy="0" r="3" fill={kindStyles.audio.stroke} />
-            </svg>
-          </div>
-        )}
+        {(() => {
+          const outConn = chainByGap['out']
+          const s = outConn ? kindStyles[outConn.kind] : kindStyles.audio
+          return (
+            <div style={{ position: 'relative', height: outConnectorH, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+              <svg
+                viewBox={`0 0 60 ${outConnectorH}`}
+                style={{ position: 'absolute', left: 'calc(50% - 30px)', width: 60, height: outConnectorH }}
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <line x1="30" y1="0" x2="30" y2={outConnectorH - 10} stroke={s.stroke} strokeWidth="1.8" strokeLinecap="round" strokeDasharray={s.dash || undefined} />
+                <path d={`M22 ${outConnectorH - 14} L30 ${outConnectorH - 4} L38 ${outConnectorH - 14}`} fill="none" stroke={s.stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="30" cy="0" r="3" fill={s.stroke} />
+              </svg>
+            </div>
+          )
+        })()}
 
         {(() => {
           const outConn = chainByGap['out']
@@ -385,8 +396,8 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
           {bypass.map(({ fromIdx, toIdx, conn }, i) => {
             const style = kindStyles[conn.kind] ?? kindStyles.midi
             const laneX = (i + 1) * LANE_W
-            const yFrom = fromIdx * STEP + ROW_H / 2
-            const yTo = toIdx * STEP + ROW_H / 2
+            const yFrom = deviceYCenter(fromIdx)
+            const yTo = toIdx < ordered.length ? deviceYCenter(toIdx) : outPillYCenter
             const path = `M 0 ${yFrom} L ${laneX - 6} ${yFrom} Q ${laneX} ${yFrom}, ${laneX} ${yFrom + 8} L ${laneX} ${yTo - 8} Q ${laneX} ${yTo}, ${laneX - 6} ${yTo} L 0 ${yTo}`
             const connLabel = defaultLabel(conn)
             const lw = labelWidthFor(connLabel)
