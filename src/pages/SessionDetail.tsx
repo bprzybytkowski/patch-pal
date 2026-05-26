@@ -604,6 +604,10 @@ export default function SessionDetailPage() {
                 ...prev,
                 { deviceId: device.id, syncRole: 'standalone', syncMode: '', patchNotes: '', device: { id: device.id, name: device.name, type: device.type } },
               ])}
+              onAddAll={(devicesToAdd) => setEditDevices((prev) => [
+                ...prev,
+                ...devicesToAdd.map((d) => ({ deviceId: d.id, syncRole: 'standalone' as const, syncMode: '', patchNotes: '', device: { id: d.id, name: d.name, type: d.type } })),
+              ])}
               onRemove={(idx) => setEditDevices((prev) => prev.filter((_, i) => i !== idx))}
               onChange={(idx, patch) => setEditDevices((prev) => prev.map((ed, i) => i === idx ? { ...ed, ...patch } : ed))}
               onReorder={(from, to) => setEditDevices((prev) => arrayMove(prev, from, to))}
@@ -1049,6 +1053,7 @@ function EditDevicesSection({
   editDevices,
   connections,
   onAdd,
+  onAddAll,
   onRemove,
   onChange,
   onReorder,
@@ -1059,6 +1064,7 @@ function EditDevicesSection({
   editDevices: EditDevice[]
   connections: { fromName: string; toName: string; kind: CableKind; label: string }[]
   onAdd: (device: Device) => void
+  onAddAll: (devices: Device[]) => void
   onRemove: (idx: number) => void
   onChange: (idx: number, patch: Partial<Omit<EditDevice, 'deviceId' | 'device'>>) => void
   onReorder: (from: number, to: number) => void
@@ -1199,22 +1205,41 @@ function EditDevicesSection({
       )}
 
       {!pickerOpen && (
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="font-serif italic text-[14px] text-ink-soft"
-          style={{
-            background: 'transparent',
-            border: '1px dashed rgb(var(--ink-muted))',
-            borderRadius: 2,
-            padding: '8px 16px',
-            cursor: 'pointer',
-            width: '100%',
-            textAlign: 'center',
-          }}
-        >
-          ＋ add device
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="font-serif italic text-[14px] text-ink-soft"
+            style={{
+              background: 'transparent',
+              border: '1px dashed rgb(var(--ink-muted))',
+              borderRadius: 2,
+              padding: '8px 16px',
+              cursor: 'pointer',
+              flex: 1,
+              textAlign: 'center',
+            }}
+          >
+            ＋ add device
+          </button>
+          {available.length > 1 && (
+            <button
+              type="button"
+              onClick={() => onAddAll(available)}
+              className="font-serif italic text-[14px] text-ink-soft"
+              style={{
+                background: 'transparent',
+                border: '1px dashed rgb(var(--ink-muted))',
+                borderRadius: 2,
+                padding: '8px 16px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ＋ add all ({available.length})
+            </button>
+          )}
+        </div>
       )}
 
       {pickerOpen && (

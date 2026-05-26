@@ -313,6 +313,33 @@ export default function NewSessionPage() {
                 return prev
               })
             }}
+            onAddAllDevices={(devicesToAdd) => {
+              const currentLastDeviceId = sessionDevices[sessionDevices.length - 1]?.deviceId
+              const currentLastDevice = currentLastDeviceId
+                ? devices.find((d) => d.id === currentLastDeviceId)
+                : null
+              const newLastDevice = devicesToAdd[devicesToAdd.length - 1]
+              setSessionDevices((prev) => [
+                ...prev,
+                ...devicesToAdd.map((d) => ({ deviceId: d.id, syncRole: 'standalone' as const, syncMode: '', patchNotes: '' })),
+              ])
+              setSessionConnections((prev) => {
+                const lastHasOut = currentLastDevice
+                  ? prev.some(
+                      (c) => c.fromName === currentLastDevice.name && c.toName === 'OUT' && c.kind === 'audio',
+                    )
+                  : false
+                if (sessionDevices.length === 0 || lastHasOut) {
+                  const filtered = currentLastDevice
+                    ? prev.filter(
+                        (c) => !(c.fromName === currentLastDevice.name && c.toName === 'OUT' && c.kind === 'audio'),
+                      )
+                    : prev
+                  return [...filtered, { fromName: newLastDevice.name, toName: 'OUT', kind: 'audio', label: '' }]
+                }
+                return prev
+              })
+            }}
             onRemoveDevice={(idx) => {
               const removed = devices.find((d) => d.id === sessionDevices[idx].deviceId)
               if (removed) {
@@ -430,6 +457,7 @@ function DevicesSection({
   sessionDevices,
   connections,
   onAddDevice,
+  onAddAllDevices,
   onRemoveDevice,
   onChange,
   onReorder,
@@ -440,6 +468,7 @@ function DevicesSection({
   sessionDevices: SessionDevice[]
   connections: SessionConnection[]
   onAddDevice: (device: Device) => void
+  onAddAllDevices: (devices: Device[]) => void
   onRemoveDevice: (idx: number) => void
   onChange: (idx: number, patch: Partial<SessionDevice>) => void
   onReorder: (from: number, to: number) => void
@@ -585,22 +614,41 @@ function DevicesSection({
       )}
 
       {!pickerOpen && (
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="font-serif italic text-[14px] text-ink-soft self-start"
-          style={{
-            background: 'transparent',
-            border: '1px dashed rgb(var(--ink-muted))',
-            borderRadius: 2,
-            padding: '8px 16px',
-            cursor: 'pointer',
-            width: '100%',
-            textAlign: 'center',
-          }}
-        >
-          ＋ add device
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="font-serif italic text-[14px] text-ink-soft"
+            style={{
+              background: 'transparent',
+              border: '1px dashed rgb(var(--ink-muted))',
+              borderRadius: 2,
+              padding: '8px 16px',
+              cursor: 'pointer',
+              flex: 1,
+              textAlign: 'center',
+            }}
+          >
+            ＋ add device
+          </button>
+          {available.length > 1 && (
+            <button
+              type="button"
+              onClick={() => onAddAllDevices(available)}
+              className="font-serif italic text-[14px] text-ink-soft"
+              style={{
+                background: 'transparent',
+                border: '1px dashed rgb(var(--ink-muted))',
+                borderRadius: 2,
+                padding: '8px 16px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ＋ add all ({available.length})
+            </button>
+          )}
+        </div>
       )}
 
       {pickerOpen && (
