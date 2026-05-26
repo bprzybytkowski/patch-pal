@@ -11,6 +11,7 @@ import { useThemeStore } from '../store/theme'
 import { useMediaQuery } from '../lib/hooks'
 import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
+import { CableDrawingSection } from '../components/CableDrawingSection'
 import { useAuthStore } from '../store/auth'
 
 const MOOD_SUGGESTIONS = [
@@ -18,7 +19,9 @@ const MOOD_SUGGESTIONS = [
   'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi',
 ] as const
 
-export type CableKind = 'midi' | 'sync' | 'audio'
+import { type CableKind } from '../components/SignalFlow'
+
+export type { CableKind }
 
 export interface SessionConnection {
   id: string
@@ -599,8 +602,8 @@ export default function SessionDetailPage() {
               onReorder={(from, to) => setEditDevices((prev) => arrayMove(prev, from, to))}
             />
 
-            {editDevices.length >= 2 && (
-              <EditConnectionsSection
+            {editDevices.length >= 1 && (
+              <CableDrawingSection
                 deviceNames={editDevices.map((ed) => ed.device.name)}
                 connections={editConnections}
                 onAdd={(c) => setEditConnections((prev) => [...prev, c])}
@@ -849,13 +852,6 @@ export default function SessionDetailPage() {
   )
 }
 
-const CABLE_KINDS: CableKind[] = ['audio', 'midi', 'sync']
-const CABLE_KIND_COLORS: Record<CableKind, string> = {
-  audio: '#c13b2a',
-  midi:  'rgb(var(--ink))',
-  sync:  'rgb(var(--ink))',
-}
-
 function GripDots() {
   return (
     <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
@@ -1095,227 +1091,4 @@ function EditDevicesSection({
   )
 }
 
-function EditConnectionsSection({
-  deviceNames,
-  connections,
-  onAdd,
-  onRemove,
-}: {
-  deviceNames: string[]
-  connections: { fromName: string; toName: string; kind: CableKind; label: string }[]
-  onAdd: (c: { fromName: string; toName: string; kind: CableKind; label: string }) => void
-  onRemove: (idx: number) => void
-}) {
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState({
-    fromName: deviceNames[0] ?? '',
-    toName: deviceNames[1] ?? '',
-    kind: 'audio' as CableKind,
-    label: '',
-  })
 
-  const toOptions = [...deviceNames, 'OUT']
-
-  const isDuplicate = connections.some(
-    (c) => c.fromName === draft.fromName && c.toName === draft.toName && c.kind === draft.kind
-  )
-
-  const confirmAdd = () => {
-    if (!draft.fromName || !draft.toName || isDuplicate) return
-    onAdd({ ...draft, label: draft.label.trim() })
-    setDraft({ fromName: deviceNames[0] ?? '', toName: deviceNames[1] ?? '', kind: 'audio', label: '' })
-    setAdding(false)
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2.5 font-mono text-[10px] tracking-[0.24em] uppercase text-ink-muted">
-        <span>Cables</span>
-        <span className="flex-1 h-px bg-rule" />
-        <span>{connections.length} {connections.length === 1 ? 'cable' : 'cables'}</span>
-      </div>
-
-      {connections.map((c, idx) => (
-        <div
-          key={idx}
-          className="flex items-center gap-2"
-          style={{
-            padding: '7px 10px',
-            background: 'rgba(0,0,0,0.025)',
-            border: '1px dashed rgb(var(--rule))',
-            borderRadius: 2,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: '"JetBrains Mono", monospace',
-              fontSize: 8,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: CABLE_KIND_COLORS[c.kind],
-              fontWeight: 700,
-              minWidth: 34,
-            }}
-          >
-            {c.kind}
-          </span>
-          <span className="font-serif italic text-[13px] text-ink flex-1 truncate">
-            {c.fromName} → {c.toName}
-          </span>
-          <span
-            style={{
-              fontFamily: '"JetBrains Mono", monospace',
-              fontSize: 10,
-              letterSpacing: '0.06em',
-              color: 'rgb(var(--ink-soft))',
-            }}
-          >
-            {c.label}
-          </span>
-          <button
-            type="button"
-            onClick={() => onRemove(idx)}
-            aria-label="Remove cable"
-            className="font-mono text-[14px] text-ink-muted hover:text-ink ml-1"
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            ×
-          </button>
-        </div>
-      ))}
-
-      {adding ? (
-        <div
-          className="flex flex-col gap-3 p-3 rounded-[2px]"
-          style={{ background: 'rgba(0,0,0,0.03)', border: '1px dashed rgb(var(--rule))' }}
-        >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">From</span>
-              <select
-                value={draft.fromName}
-                onChange={(e) => setDraft((d) => ({ ...d, fromName: e.target.value }))}
-                className="font-serif text-[14px] text-ink bg-transparent outline-none"
-                style={{ border: 'none', borderBottom: '1.5px solid rgb(var(--ink))', padding: '4px 0' }}
-              >
-                {deviceNames.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">To</span>
-              <select
-                value={draft.toName}
-                onChange={(e) => setDraft((d) => ({ ...d, toName: e.target.value }))}
-                className="font-serif text-[14px] text-ink bg-transparent outline-none"
-                style={{ border: 'none', borderBottom: '1.5px solid rgb(var(--ink))', padding: '4px 0' }}
-              >
-                {toOptions.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-1.5">
-            {CABLE_KINDS.map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setDraft((d) => ({ ...d, kind: k }))}
-                style={{
-                  fontFamily: '"JetBrains Mono", monospace',
-                  fontSize: 9,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  fontWeight: 700,
-                  padding: '4px 8px 3px',
-                  borderRadius: 2,
-                  border: '1.5px solid',
-                  cursor: 'pointer',
-                  ...(draft.kind === k
-                    ? { background: 'rgb(var(--ink))', color: 'rgb(var(--paper))', borderColor: 'rgb(var(--ink))' }
-                    : { background: 'transparent', color: 'rgb(var(--ink-muted))', borderColor: 'rgb(var(--rule))' }),
-                }}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
-
-          <input
-            placeholder="Cable label, e.g. stereo out, sy1 audio sync"
-            value={draft.label}
-            onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmAdd() } }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: '1px dashed rgb(var(--ink-muted))',
-              padding: '4px 0',
-              fontFamily: '"Spectral", serif',
-              fontStyle: 'italic',
-              fontSize: 14,
-              color: 'rgb(var(--ink-soft))',
-              outline: 'none',
-            }}
-          />
-
-          <div className="flex gap-3 items-center">
-            <button
-              type="button"
-              onClick={confirmAdd}
-              disabled={draft.fromName === draft.toName || isDuplicate}
-              style={{
-                fontFamily: '"JetBrains Mono", monospace',
-                fontSize: 10,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                fontWeight: 700,
-                padding: '5px 12px 4px',
-                borderRadius: 2,
-                border: 'none',
-                background: 'rgb(var(--ink))',
-                color: 'rgb(var(--paper))',
-                cursor: 'pointer',
-                opacity: draft.fromName === draft.toName || isDuplicate ? 0.4 : 1,
-              }}
-            >
-              Add cable
-            </button>
-            {isDuplicate && (
-              <span className="font-mono text-[9px] tracking-[0.16em] uppercase text-ink-muted">
-                already connected
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setAdding(false)}
-              className="font-serif italic text-[13px] text-ink-muted"
-              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setDraft({ fromName: deviceNames[0] ?? '', toName: deviceNames[1] ?? '', kind: 'audio', label: '' })
-            setAdding(true)
-          }}
-          className="font-serif italic text-[14px] text-ink-soft"
-          style={{
-            background: 'transparent',
-            border: '1px dashed rgb(var(--ink-muted))',
-            borderRadius: 2,
-            padding: '8px 16px',
-            cursor: 'pointer',
-            width: '100%',
-            textAlign: 'center',
-          }}
-        >
-          ＋ add cable
-        </button>
-      )}
-    </div>
-  )
-}

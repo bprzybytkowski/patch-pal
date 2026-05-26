@@ -36,6 +36,12 @@ function makeSaveSessionDevices() {
   }
 }
 
+function makeSaveConnections() {
+  return {
+    insert: vi.fn().mockResolvedValue({ data: [], error: null }),
+  }
+}
+
 function renderNewSession(locationState?: unknown) {
   render(
     <MemoryRouter initialEntries={[{ pathname: '/sessions/new', state: locationState }]}>
@@ -120,7 +126,7 @@ describe('New session form', () => {
     await screen.findByLabelText(/title/i)
     await userEvent.click(screen.getByRole('button', { name: /add device/i }))
     await userEvent.selectOptions(await screen.findByRole('combobox'), 'dev-1')
-    expect(await screen.findByText('PO-33')).toBeInTheDocument()
+    expect((await screen.findAllByText('PO-33')).length).toBeGreaterThan(0)
     expect(screen.queryByRole('option', { name: /PO-33/i })).not.toBeInTheDocument()
   })
 
@@ -138,7 +144,7 @@ describe('New session form', () => {
     await screen.findByLabelText(/title/i)
     await userEvent.click(screen.getByRole('button', { name: /add device/i }))
     await userEvent.selectOptions(await screen.findByRole('combobox'), 'dev-1')
-    await screen.findByText('PO-33')
+    expect(await screen.findAllByText('PO-33')).not.toHaveLength(0)
     const standaloneBtn = screen.getByRole('button', { name: /standalone/i })
     expect(standaloneBtn).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(screen.getByRole('button', { name: /remove device/i }))
@@ -158,10 +164,12 @@ describe('New session form', () => {
 
   it('saves added devices to session_devices on submit', async () => {
     const saveDevicesMock = { insert: vi.fn().mockResolvedValue({ data: [], error: null }) }
+    const saveConnectionsMock = makeSaveConnections()
     mockFrom
       .mockReturnValueOnce(makeDevicesFetch([PO]) as never)
       .mockReturnValueOnce(makeSaveSession() as never)
       .mockReturnValueOnce(saveDevicesMock as never)
+      .mockReturnValueOnce(saveConnectionsMock as never)
     renderNewSession()
     await userEvent.type(await screen.findByLabelText(/title/i), 'Test jam')
     await userEvent.click(screen.getByRole('button', { name: /add device/i }))
@@ -173,6 +181,15 @@ describe('New session form', () => {
         session_id: 'sess-1',
         device_id: 'dev-1',
         sync_role: 'standalone',
+        sort_order: 0,
+      }),
+    ])
+    expect(saveConnectionsMock.insert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        session_id: 'sess-1',
+        from_name: 'PO-33',
+        to_name: 'OUT',
+        kind: 'audio',
         sort_order: 0,
       }),
     ])
@@ -205,7 +222,7 @@ describe('New session form', () => {
       devices: [{ deviceId: 'dev-1', syncRole: 'master' as const, syncMode: 'SY2', patchNotes: 'bass patch' }],
     }
     renderNewSession({ forkedFrom: 'sess-0', prefill })
-    expect(await screen.findByText('PO-33')).toBeInTheDocument()
+    expect((await screen.findAllByText('PO-33')).length).toBeGreaterThan(0)
     expect(screen.getByDisplayValue('SY2')).toBeInTheDocument()
     expect(screen.getByDisplayValue('bass patch')).toBeInTheDocument()
     const masterBtn = screen.getByRole('button', { name: /master/i })
