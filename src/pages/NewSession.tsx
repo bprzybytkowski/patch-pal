@@ -11,7 +11,14 @@ import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
 import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type CableKind } from '../components/SignalFlow'
-import { CableDrawingSection } from '../components/CableDrawingSection'
+import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
+import { useConnectionDrawing } from '../lib/hooks'
+
+const CABLE_KIND_COLORS: Record<CableKind, string> = {
+  audio: '#c13b2a',
+  midi: 'rgb(var(--ink))',
+  sync: 'rgb(var(--ink))',
+}
 
 const MOOD_SUGGESTIONS = [
   'dark', 'hypnotic', 'ambient', 'playful', 'broken',
@@ -279,7 +286,8 @@ export default function NewSessionPage() {
           <DevicesSection
             devices={devices}
             sessionDevices={sessionDevices}
-            onAdd={(device) => {
+            connections={sessionConnections}
+            onAddDevice={(device) => {
               const isFirst = sessionDevices.length === 0
               setSessionDevices((prev) => [
                 ...prev,
@@ -297,7 +305,7 @@ export default function NewSessionPage() {
                 })
               }
             }}
-            onRemove={(idx) => {
+            onRemoveDevice={(idx) => {
               const removed = devices.find((d) => d.id === sessionDevices[idx].deviceId)
               if (removed) {
                 setSessionConnections((prev) =>
@@ -310,19 +318,9 @@ export default function NewSessionPage() {
               setSessionDevices((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)))
             }
             onReorder={(from, to) => setSessionDevices((prev) => arrayMove(prev, from, to))}
+            onAddConnection={(c) => setSessionConnections((prev) => [...prev, c])}
+            onRemoveConnection={(idx) => setSessionConnections((prev) => prev.filter((_, i) => i !== idx))}
           />
-
-          {/* Cables section */}
-          {sessionDevices.length >= 1 && (
-            <CableDrawingSection
-              deviceNames={sessionDevices
-                .map((sd) => devices.find((d) => d.id === sd.deviceId)?.name)
-                .filter(Boolean) as string[]}
-              connections={sessionConnections}
-              onAdd={(c) => setSessionConnections((prev) => [...prev, c])}
-              onRemove={(idx) => setSessionConnections((prev) => prev.filter((_, i) => i !== idx))}
-            />
-          )}
 
           {/* Live signal flow preview */}
           {sessionConnections.length > 0 && sessionDevices.length > 0 && (
@@ -401,21 +399,35 @@ const SYNC_ROLES = ['master', 'slave', 'standalone'] as const
 function DevicesSection({
   devices,
   sessionDevices,
-  onAdd,
-  onRemove,
+  connections,
+  onAddDevice,
+  onRemoveDevice,
   onChange,
   onReorder,
+  onAddConnection,
+  onRemoveConnection,
 }: {
   devices: Device[]
   sessionDevices: SessionDevice[]
-  onAdd: (device: Device) => void
-  onRemove: (idx: number) => void
+  connections: SessionConnection[]
+  onAddDevice: (device: Device) => void
+  onRemoveDevice: (idx: number) => void
   onChange: (idx: number, patch: Partial<SessionDevice>) => void
   onReorder: (from: number, to: number) => void
+  onAddConnection: (c: SessionConnection) => void
+  onRemoveConnection: (idx: number) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickedIds = new Set(sessionDevices.map((d) => d.deviceId))
   const available = devices.filter((d) => !pickedIds.has(d.id))
+  const { armedDevice, pending, arm, complete, cancel: cancelArm, dismissPending } = useConnectionDrawing()
+  const isArmed = armedDevice !== null
+
+  const handleConfirm = (kind: CableKind, label: string) => {
+    if (!pending) return
+    onAddConnection({ fromName: pending.from, toName: pending.to, kind, label })
+    dismissPending()
+  }
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return
@@ -438,18 +450,108 @@ function DevicesSection({
           {sessionDevices.map((sd, idx) => {
             const device = devices.find((d) => d.id === sd.deviceId)
             if (!device) return null
+            const connectionMode =
+              armedDevice === device.name ? 'armed' : isArmed ? 'targeting' : 'idle'
+            const connectionCount = connections.filter(
+              (c) => c.fromName === device.name || c.toName === device.name,
+            ).length
             return (
               <DeviceCard
                 key={sd.deviceId}
                 device={device}
                 sessionDevice={sd}
                 onChange={(patch) => onChange(idx, patch)}
-                onRemove={() => onRemove(idx)}
+                onRemove={() => onRemoveDevice(idx)}
+                connectionMode={connectionMode}
+                connectionCount={connectionCount}
+                onArm={() => arm(device.name)}
+                onConnect={() => complete(device.name)}
               />
             )
           })}
         </SortableContext>
       </DndContext>
+
+      {/* OUT terminal — only visible when a device is armed */}
+      {isArmed && (
+        <button
+          type="button"
+          onClick={() => complete('OUT')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 14px',
+            border: '1px dashed rgb(var(--ink-muted))',
+            borderRadius: 2,
+            background: 'transparent',
+            cursor: 'pointer',
+            width: '100%',
+          }}
+        >
+          <span style={{
+            fontFamily: '"JetBrains Mono", monospace',
+            fontSize: 9,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            color: 'rgb(var(--ink-muted))',
+          }}>
+            OUT
+          </span>
+          <span className="flex-1" />
+          <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: 'rgb(var(--ink-muted))', opacity: 0.7 }}>
+            →
+          </span>
+        </button>
+      )}
+
+      {/* Cable list */}
+      {connections.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {connections.map((c, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-2"
+              style={{
+                padding: '5px 10px',
+                background: 'rgba(0,0,0,0.02)',
+                border: '1px dashed rgb(var(--rule))',
+                borderRadius: 2,
+              }}
+            >
+              <span style={{
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 8,
+                letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                color: CABLE_KIND_COLORS[c.kind],
+                fontWeight: 700,
+                minWidth: 34,
+              }}>
+                {c.kind}
+              </span>
+              <span className="font-serif italic text-[12px] text-ink flex-1 truncate">
+                {c.fromName} → {c.toName}
+              </span>
+              {c.label && (
+                <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 9, color: 'rgb(var(--ink-soft))' }}>
+                  {c.label}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => onRemoveConnection(idx)}
+                aria-label="Remove cable"
+                className="font-mono text-[13px] text-ink-muted hover:text-ink ml-1"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!pickerOpen && (
         <button
@@ -497,7 +599,7 @@ function DevicesSection({
               onChange={(e) => {
                 const device = devices.find((d) => d.id === e.target.value)
                 if (device) {
-                  onAdd(device)
+                  onAddDevice(device)
                   setPickerOpen(false)
                 }
               }}
@@ -517,6 +619,15 @@ function DevicesSection({
             cancel
           </button>
         </div>
+      )}
+
+      {pending && (
+        <ConnectionTypeSheet
+          pending={pending}
+          existingConnections={connections}
+          onConfirm={handleConfirm}
+          onCancel={() => { dismissPending(); cancelArm() }}
+        />
       )}
     </div>
   )
@@ -540,11 +651,19 @@ function DeviceCard({
   sessionDevice,
   onChange,
   onRemove,
+  connectionMode,
+  connectionCount,
+  onArm,
+  onConnect,
 }: {
   device: Device
   sessionDevice: SessionDevice
   onChange: (patch: Partial<SessionDevice>) => void
   onRemove: () => void
+  connectionMode: 'idle' | 'armed' | 'targeting'
+  connectionCount: number
+  onArm: () => void
+  onConnect: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: sessionDevice.deviceId })
 
@@ -555,9 +674,17 @@ function DeviceCard({
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition ?? undefined,
-        background: 'rgb(var(--card-active))',
-        border: '1px solid rgb(var(--ink))',
-        boxShadow: '2px 2px 0 rgba(var(--ink)/0.15)',
+        background: connectionMode === 'armed' ? 'rgb(var(--card-active))' : 'rgb(var(--card-active))',
+        border: connectionMode === 'armed'
+          ? '1.5px solid rgb(var(--ink))'
+          : connectionMode === 'targeting'
+          ? '1px dashed rgb(var(--ink-muted))'
+          : '1px solid rgb(var(--ink))',
+        boxShadow: connectionMode === 'armed'
+          ? '3px 3px 0 rgba(var(--ink)/0.2)'
+          : connectionMode === 'targeting'
+          ? 'none'
+          : '2px 2px 0 rgba(var(--ink)/0.15)',
       }}
     >
       <button
@@ -581,13 +708,26 @@ function DeviceCard({
         ×
       </button>
 
-      <div className="px-6">
-        <div className="font-serif font-semibold text-[15px] text-ink leading-tight">
-          {device.name}
+      <div className="px-6 flex items-center justify-between">
+        <div>
+          <div className="font-serif font-semibold text-[15px] text-ink leading-tight">
+            {device.name}
+          </div>
+          <div className="font-mono text-[9px] tracking-[0.16em] uppercase text-ink-muted mt-0.5">
+            {device.type.replace(/_/g, ' ')}
+          </div>
         </div>
-        <div className="font-mono text-[9px] tracking-[0.16em] uppercase text-ink-muted mt-0.5">
-          {device.type.replace(/_/g, ' ')}
-        </div>
+        {connectionMode === 'idle' && connectionCount > 0 && (
+          <span
+            title={`${connectionCount} cable${connectionCount !== 1 ? 's' : ''}`}
+            style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgb(var(--ink-muted))', flexShrink: 0, marginRight: 4 }}
+          />
+        )}
+        {connectionMode === 'armed' && (
+          <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgb(var(--ink-muted))' }}>
+            from
+          </span>
+        )}
       </div>
 
       {/* Role selector */}
@@ -661,6 +801,37 @@ function DeviceCard({
         value={sessionDevice.patchNotes}
         onChange={(e) => onChange({ patchNotes: e.target.value })}
       />
+
+      {/* Connection strip */}
+      <button
+        type="button"
+        onClick={connectionMode === 'armed' ? onArm : connectionMode === 'targeting' ? onConnect : onArm}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          padding: '6px 10px',
+          margin: '0 -3px -3px',
+          border: 'none',
+          borderTop: connectionMode === 'targeting'
+            ? '1px solid rgb(var(--ink-muted))'
+            : '1px dashed rgb(var(--rule))',
+          borderRadius: '0 0 2px 2px',
+          background: connectionMode === 'targeting' ? 'rgba(var(--ink)/0.04)' : 'transparent',
+          cursor: 'pointer',
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: 8,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: connectionMode === 'targeting' ? 'rgb(var(--ink))' : 'rgb(var(--ink-muted))',
+          fontWeight: connectionMode === 'targeting' ? 700 : 400,
+        }}
+      >
+        {connectionMode === 'idle' && '⟶ wire'}
+        {connectionMode === 'armed' && 'cancel ×'}
+        {connectionMode === 'targeting' && '→ connect here'}
+      </button>
     </div>
   )
 }
