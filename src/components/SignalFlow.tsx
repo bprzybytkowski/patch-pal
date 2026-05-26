@@ -319,7 +319,8 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
   const deviceYCenter = (i: number) => deviceTops[i] + ROW_H / 2
   const outPillYCenter = outPillTop + outPillH / 2
   const totalH = outPillTop + outPillH + 16
-  const outStyle = outConn ? kindStyles[outConn.kind] : kindStyles.audio
+  const resolvedOutConn: SignalFlowConnection | null = outConn
+  const outStyle = resolvedOutConn ? kindStyles[resolvedOutConn.kind] : kindStyles.audio
   const outConnectorSection = (
     <>
       <div style={{ position: 'relative', height: outConnectorH, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
