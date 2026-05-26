@@ -58,6 +58,10 @@ const CABLE_KIND_STYLE = {
   },
 }
 
+// Spacing between parallel cable lines
+const ADJ_LINE_SPACING = 10  // adjacent (between device rows)
+const BYP_LINE_SPACING = 5   // bypass (side SVG)
+
 function RoleStamp({ role, theme }: { role: string; theme: 'light' | 'dark' }) {
   const T = SF_THEME[theme]
   const r = role === 'master' ? T.roleMaster : role === 'slave' ? T.roleSlave : T.roleSolo
@@ -170,20 +174,25 @@ function defaultLabel(conn: SignalFlowConnection): string {
   return conn.label
 }
 
-function CableConnector({
-  conn,
+// Renders 1–N parallel cables between two adjacent device rows
+function CableConnectorGroup({
+  conns,
   theme,
 }: {
-  conn: SignalFlowConnection
+  conns: SignalFlowConnection[]
   theme: 'light' | 'dark'
 }) {
-  const style = CABLE_KIND_STYLE[theme][conn.kind] ?? CABLE_KIND_STYLE[theme].midi
-  const label = defaultLabel(conn)
+  const H = 56
+  const n = conns.length
+  const spread = (n - 1) * ADJ_LINE_SPACING
+  const svgW = Math.max(60, spread + 60)
+  const cx = svgW / 2
+
   return (
     <div
       style={{
         position: 'relative',
-        height: 56,
+        height: H,
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -191,70 +200,78 @@ function CableConnector({
       }}
     >
       <svg
-        viewBox="0 0 60 56"
-        preserveAspectRatio="none"
+        viewBox={`0 0 ${svgW} ${H}`}
         style={{
           position: 'absolute',
-          inset: 0,
-          width: 60,
-          height: '100%',
-          left: 'calc(50% - 30px)',
+          top: 0,
+          left: `calc(50% - ${svgW / 2}px)`,
+          width: svgW,
+          height: H,
         }}
         xmlns="http://www.w3.org/2000/svg"
       >
-        <line
-          x1="30" y1="0" x2="30" y2="46"
-          stroke={style.stroke}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeDasharray={style.dash || undefined}
-        />
-        <path
-          d="M22 42 L30 52 L38 42"
-          fill="none"
-          stroke={style.stroke}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle cx="30" cy="0" r="3" fill={style.stroke} />
+        {conns.map((conn, idx) => {
+          const style = CABLE_KIND_STYLE[theme][conn.kind]
+          const x = cx + (idx - (n - 1) / 2) * ADJ_LINE_SPACING
+          return (
+            <g key={conn.kind}>
+              <circle cx={x} cy={0} r={3} fill={style.stroke} />
+              <line
+                x1={x} y1={0} x2={x} y2={46}
+                stroke={style.stroke}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeDasharray={style.dash || undefined}
+              />
+              <path
+                d={`M${x - 8} 42 L${x} 52 L${x + 8} 42`}
+                fill="none"
+                stroke={style.stroke}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          )
+        })}
       </svg>
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          background: style.labelBg,
-          border: `1px solid ${style.stroke}`,
-          borderRadius: 2,
-          padding: '3px 9px 2px',
-          fontFamily: '"JetBrains Mono", monospace',
-          fontSize: 10,
-          letterSpacing: '0.06em',
-          color: style.labelColor,
-          textTransform: 'lowercase',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 8,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            color: style.labelColor,
-            opacity: 0.65,
-            fontWeight: 700,
-          }}
-        >
-          {style.label}
-        </span>
-        {label && (
-          <>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>{label}</span>
-          </>
-        )}
+
+      {/* Label pills – horizontal row */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: 4 }}>
+        {conns.map((conn) => {
+          const style = CABLE_KIND_STYLE[theme][conn.kind]
+          const label = defaultLabel(conn)
+          return (
+            <div
+              key={conn.kind}
+              style={{
+                background: style.labelBg,
+                border: `1px solid ${style.stroke}`,
+                borderRadius: 2,
+                padding: '3px 8px 2px',
+                fontFamily: '"JetBrains Mono", monospace',
+                fontSize: 9,
+                letterSpacing: '0.18em',
+                color: style.labelColor,
+                textTransform: 'uppercase',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              {style.label}
+              {label && (
+                <>
+                  <span style={{ opacity: 0.35 }}>·</span>
+                  <span style={{ textTransform: 'lowercase', letterSpacing: '0.04em', fontWeight: 400 }}>
+                    {label}
+                  </span>
+                </>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -296,22 +313,44 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
     }
   })
 
+  // Group bypass connections by (fromIdx, toIdx) so parallel cables share a lane
+  const bypassGroupMap = new Map<string, { fromIdx: number; toIdx: number; conns: SignalFlowConnection[] }>()
+  bypass.forEach(({ fromIdx, toIdx, conn }) => {
+    const key = `${fromIdx}:${toIdx}`
+    if (!bypassGroupMap.has(key)) bypassGroupMap.set(key, { fromIdx, toIdx, conns: [] })
+    bypassGroupMap.get(key)!.conns.push(conn)
+  })
+  const bypassGroups = [...bypassGroupMap.values()]
+
   const ROW_H = compact ? 64 : 72
   const GAP_H = 56
   const LANE_W = 24
-  const labelWidthFor = (l: string) => l.length * 5.5 + 14
-  const maxLabelW = bypass.length ? Math.max(...bypass.map((b) => labelWidthFor(defaultLabel(b.conn)))) : 0
-  const lanesW = bypass.length * LANE_W
-  const svgW = lanesW + maxLabelW + 24
-  const paddingR = bypass.length > 0 ? svgW + 8 : 0
 
-  // Compute actual Y tops/centers based on real gap heights
+  // Label width for a bypass cable (kind label + optional custom label)
+  const bypassLabelW = (conn: SignalFlowConnection): number => {
+    const k = kindStyles[conn.kind] ?? kindStyles.midi
+    const custom = defaultLabel(conn)
+    return k.label.length * 5.5 + 14 + (custom ? 5.5 + custom.length * 5.5 : 0)
+  }
+
+  const maxLabelW = bypassGroups.length
+    ? Math.max(...bypassGroups.flatMap((g) => g.conns.map(bypassLabelW)))
+    : 0
+  // Extra horizontal room needed for the widest group of parallel lines
+  const maxGroupExtraW = bypassGroups.length
+    ? Math.max(...bypassGroups.map((g) => Math.floor((g.conns.length - 1) / 2) * BYP_LINE_SPACING))
+    : 0
+  const lanesW = bypassGroups.length * LANE_W
+  const svgW = lanesW + maxGroupExtraW + maxLabelW + 24
+  const paddingR = bypassGroups.length > 0 ? svgW + 8 : 0
+
+  // Compute actual Y tops/centers based on real gap heights (parallel = single GAP_H per pair)
   const deviceTops: number[] = []
   let _yAcc = 0
   for (let i = 0; i < ordered.length; i++) {
     deviceTops.push(_yAcc)
     _yAcc += ROW_H
-    if (i < ordered.length - 1) _yAcc += chainByGap[i] ? chainByGap[i].length * GAP_H : 32
+    if (i < ordered.length - 1) _yAcc += chainByGap[i] ? GAP_H : 32
   }
   const outConnectorH = 40
   const outPillH = 28
@@ -366,19 +405,18 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
               isMaster={d.role === 'master'}
               compact={compact}
             />
-            {i < ordered.length - 1 && chainByGap[i]
-              ? chainByGap[i].map((conn) => (
-                  <CableConnector key={conn.kind} conn={conn} theme={theme} />
-                ))
-              : i < ordered.length - 1 && <div style={{ height: 32 }} />
-            }
+            {i < ordered.length - 1 && (
+              chainByGap[i]
+                ? <CableConnectorGroup conns={chainByGap[i]} theme={theme} />
+                : <div style={{ height: 32 }} />
+            )}
           </div>
         ))}
 
         {outConnectorSection}
       </div>
 
-      {bypass.length > 0 && (
+      {bypassGroups.length > 0 && (
         <svg
           width={svgW}
           height={totalH}
@@ -391,54 +429,75 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
           }}
           xmlns="http://www.w3.org/2000/svg"
         >
-          {bypass.map(({ fromIdx, toIdx, conn }, i) => {
-            const style = kindStyles[conn.kind] ?? kindStyles.midi
-            const laneX = (i + 1) * LANE_W
+          {bypassGroups.map(({ fromIdx, toIdx, conns: gConns }, gi) => {
+            const laneX = (gi + 1) * LANE_W
             const yFrom = deviceYCenter(fromIdx)
             const yTo = toIdx < ordered.length ? deviceYCenter(toIdx) : outPillYCenter
-            const path = `M 0 ${yFrom} L ${laneX - 6} ${yFrom} Q ${laneX} ${yFrom}, ${laneX} ${yFrom + 8} L ${laneX} ${yTo - 8} Q ${laneX} ${yTo}, ${laneX - 6} ${yTo} L 0 ${yTo}`
-            const connLabel = defaultLabel(conn)
-            const lw = labelWidthFor(connLabel)
+            const midY = (yFrom + yTo) / 2
+            const n = gConns.length
+
+            // Stacked label geometry
+            const labelRowH = 17
+            const totalLH = n * labelRowH
+            const labelTopY = midY - totalLH / 2
+            const rightmostX = laneX + ((n - 1) / 2) * BYP_LINE_SPACING
+            const labelX = rightmostX + 8
+
             return (
-              <g key={i}>
-                <path
-                  d={path}
-                  fill="none"
-                  stroke={style.stroke}
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeDasharray={style.dash || undefined}
-                />
-                <path
-                  d={`M 8 ${yTo - 5} L 0 ${yTo} L 8 ${yTo + 5}`}
-                  fill="none"
-                  stroke={style.stroke}
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="0" cy={yFrom} r="2.5" fill={style.stroke} />
-                <g transform={`translate(${laneX + 6}, ${(yFrom + yTo) / 2})`}>
-                  <rect
-                    x="-3"
-                    y="-9"
-                    width={lw}
-                    height="18"
-                    fill={style.labelBg}
-                    stroke={style.stroke}
-                    strokeWidth="0.8"
-                    rx="2"
-                  />
-                  <text
-                    x="4"
-                    y="4"
-                    fontFamily="JetBrains Mono, monospace"
-                    fontSize="9"
-                    fill={style.stroke}
-                  >
-                    {connLabel}
-                  </text>
-                </g>
+              <g key={gi}>
+                {gConns.map((conn, ci) => {
+                  const style = kindStyles[conn.kind] ?? kindStyles.midi
+                  const x = laneX + (ci - (n - 1) / 2) * BYP_LINE_SPACING
+                  const path = `M 0 ${yFrom} L ${x - 6} ${yFrom} Q ${x} ${yFrom}, ${x} ${yFrom + 8} L ${x} ${yTo - 8} Q ${x} ${yTo}, ${x - 6} ${yTo} L 0 ${yTo}`
+                  const custom = defaultLabel(conn)
+                  const displayText = custom ? `${style.label} · ${custom}` : style.label
+                  const lw = bypassLabelW(conn)
+                  const rowY = labelTopY + ci * labelRowH
+
+                  return (
+                    <g key={conn.kind}>
+                      <path
+                        d={path}
+                        fill="none"
+                        stroke={style.stroke}
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeDasharray={style.dash || undefined}
+                      />
+                      <path
+                        d={`M 8 ${yTo - 5} L 0 ${yTo} L 8 ${yTo + 5}`}
+                        fill="none"
+                        stroke={style.stroke}
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle cx="0" cy={yFrom} r="2.5" fill={style.stroke} />
+                      {/* Label row */}
+                      <rect
+                        x={labelX - 3}
+                        y={rowY}
+                        width={lw}
+                        height={labelRowH - 2}
+                        fill={style.labelBg}
+                        stroke={style.stroke}
+                        strokeWidth="0.8"
+                        rx="2"
+                      />
+                      <text
+                        x={labelX + 1}
+                        y={rowY + labelRowH - 6}
+                        fontFamily="JetBrains Mono, monospace"
+                        fontSize="8"
+                        fontWeight="600"
+                        fill={style.labelColor}
+                        letterSpacing="0.14em"
+                      >
+                        {displayText}
+                      </text>
+                    </g>
+                  )
+                })}
               </g>
             )
           })}
