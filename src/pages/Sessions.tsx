@@ -535,9 +535,9 @@ export default function SessionsPage() {
           className="px-8 py-8 flex flex-col gap-[18px] border-r border-dashed border-rule relative"
           style={{ minHeight: 'calc(100vh - 72px)' }}
         >
-          {/* Header row */}
+          {/* Header row — hidden on mobile (title = Layout header, action = FAB) */}
           <div
-            className="flex justify-between items-end pb-2.5"
+            className="hidden sm:flex justify-between items-end pb-2.5"
             style={{ borderBottom: '1.5px solid rgb(var(--ink))' }}
           >
             <div className="flex items-baseline gap-2.5 lg:hidden">
