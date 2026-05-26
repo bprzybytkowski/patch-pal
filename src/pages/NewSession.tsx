@@ -777,7 +777,7 @@ function DeviceCard({
         {...attributes}
         aria-label="Drag to reorder"
         className="absolute top-2.5 left-2"
-        style={{ background: 'none', border: 'none', cursor: 'grab', padding: '2px 4px', color: 'rgb(var(--ink-muted))' }}
+        style={{ background: 'none', border: 'none', cursor: 'grab', padding: '2px 4px', color: 'rgb(var(--ink-muted))', touchAction: 'none' }}
       >
         <GripDots />
       </button>
