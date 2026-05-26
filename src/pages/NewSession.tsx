@@ -325,7 +325,28 @@ export default function NewSessionPage() {
             onChange={(idx, patch) =>
               setSessionDevices((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)))
             }
-            onReorder={(from, to) => setSessionDevices((prev) => arrayMove(prev, from, to))}
+            onReorder={(from, to) => {
+              const reordered = arrayMove(sessionDevices, from, to)
+              setSessionDevices(reordered)
+              const oldLastId = sessionDevices[sessionDevices.length - 1]?.deviceId
+              const newLastId = reordered[reordered.length - 1]?.deviceId
+              if (oldLastId !== newLastId) {
+                const oldLast = devices.find((d) => d.id === oldLastId)
+                const newLast = devices.find((d) => d.id === newLastId)
+                if (oldLast && newLast) {
+                  setSessionConnections((prev) => {
+                    const hasOldOut = prev.some(
+                      (c) => c.fromName === oldLast.name && c.toName === 'OUT' && c.kind === 'audio',
+                    )
+                    if (!hasOldOut) return prev
+                    return [
+                      ...prev.filter((c) => !(c.fromName === oldLast.name && c.toName === 'OUT' && c.kind === 'audio')),
+                      { fromName: newLast.name, toName: 'OUT', kind: 'audio', label: '' },
+                    ]
+                  })
+                }
+              }
+            }}
             onAddConnection={(c) => setSessionConnections((prev) => [...prev, c])}
             onRemoveConnection={(idx) => setSessionConnections((prev) => prev.filter((_, i) => i !== idx))}
           />
