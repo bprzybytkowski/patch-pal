@@ -167,8 +167,6 @@ function DeviceRow({
 }
 
 function defaultLabel(conn: SignalFlowConnection): string {
-  if (conn.label) return conn.label
-  if (conn.kind === 'sync') return 'sync'
   return conn.label
 }
 
@@ -251,8 +249,12 @@ function CableConnector({
         >
           {style.label}
         </span>
-        <span style={{ opacity: 0.4 }}>·</span>
-        <span>{label}</span>
+        {label && (
+          <>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>{label}</span>
+          </>
+        )}
       </div>
     </div>
   )
@@ -270,7 +272,8 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
   const ordered = [...devices]
   const orderIdx = (name: string) => ordered.findIndex((d) => d.name === name)
 
-  const chainByGap: Record<string | number, SignalFlowConnection> = {}
+  const chainByGap: Record<number, SignalFlowConnection[]> = {}
+  let outConn: SignalFlowConnection | null = null
   const bypass: Array<{ fromIdx: number; toIdx: number; conn: SignalFlowConnection }> = []
 
   connections.forEach((c) => {
@@ -278,15 +281,16 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
     const ti = orderIdx(c.to)
     if (c.to === 'OUT') {
       if (c.from === ordered[ordered.length - 1]?.name) {
-        chainByGap['out'] = c
+        if (!outConn) outConn = c
       } else {
         bypass.push({ fromIdx: fi, toIdx: ordered.length, conn: c })
       }
       return
     }
     if (fi === -1) return
-    if (ti !== -1 && ti - fi === 1 && !chainByGap[fi]) {
-      chainByGap[fi] = c
+    if (ti !== -1 && ti - fi === 1) {
+      if (!chainByGap[fi]) chainByGap[fi] = []
+      chainByGap[fi].push(c)
     } else {
       bypass.push({ fromIdx: fi, toIdx: ti === -1 ? ordered.length : ti, conn: c })
     }
@@ -307,7 +311,7 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
   for (let i = 0; i < ordered.length; i++) {
     deviceTops.push(_yAcc)
     _yAcc += ROW_H
-    if (i < ordered.length - 1) _yAcc += chainByGap[i] ? GAP_H : 32
+    if (i < ordered.length - 1) _yAcc += chainByGap[i] ? chainByGap[i].length * GAP_H : 32
   }
   const outConnectorH = 40
   const outPillH = 28
@@ -328,17 +332,16 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
               isMaster={d.role === 'master'}
               compact={compact}
             />
-            {i < ordered.length - 1 && chainByGap[i] && (
-              <CableConnector conn={chainByGap[i]} theme={theme} />
-            )}
-            {i < ordered.length - 1 && !chainByGap[i] && (
-              <div style={{ height: 32 }} />
-            )}
+            {i < ordered.length - 1 && chainByGap[i]
+              ? chainByGap[i].map((conn) => (
+                  <CableConnector key={conn.kind} conn={conn} theme={theme} />
+                ))
+              : i < ordered.length - 1 && <div style={{ height: 32 }} />
+            }
           </div>
         ))}
 
         {(() => {
-          const outConn = chainByGap['out']
           const s = outConn ? kindStyles[outConn.kind] : kindStyles.audio
           return (
             <div style={{ position: 'relative', height: outConnectorH, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
@@ -356,7 +359,6 @@ export default function SignalFlow({ devices, connections, theme, compact = fals
         })()}
 
         {(() => {
-          const outConn = chainByGap['out']
           const style = outConn ? kindStyles[outConn.kind] : kindStyles.audio
           return (
             <div
