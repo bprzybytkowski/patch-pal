@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { DndContext, type DragEndEvent } from '@dnd-kit/core'
+import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
@@ -481,6 +481,11 @@ function DevicesSection({
   const { armedDevice, pending, arm, complete, cancel: cancelArm, dismissPending } = useConnectionDrawing()
   const isArmed = armedDevice !== null
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
+
   const handleConfirm = (kinds: CableKind[], label: string) => {
     if (!pending) return
     for (const kind of kinds) {
@@ -505,7 +510,7 @@ function DevicesSection({
         <span className="flex-1 h-px bg-rule" />
       </div>
 
-      <DndContext onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <SortableContext items={sessionDevices.map((sd) => sd.deviceId)} strategy={verticalListSortingStrategy}>
           {sessionDevices.map((sd, idx) => {
             const device = devices.find((d) => d.id === sd.deviceId)
