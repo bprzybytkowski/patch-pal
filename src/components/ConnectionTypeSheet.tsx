@@ -7,7 +7,7 @@ const CABLE_KINDS: CableKind[] = ['audio', 'midi', 'sync']
 interface Props {
   pending: { from: string; to: string }
   existingConnections: { fromName: string; toName: string; kind: CableKind }[]
-  onConfirm: (kind: CableKind, label: string) => void
+  onConfirm: (kinds: CableKind[], label: string) => void
   onCancel: () => void
 }
 
@@ -21,22 +21,41 @@ export function ConnectionTypeSheet({ pending, existingConnections, onConfirm, o
   )
   const availableKinds = CABLE_KINDS.filter((k) => !usedKinds.has(k))
 
-  const [kind, setKind] = useState<CableKind>(() => availableKinds[0] ?? 'audio')
+  const [kinds, setKinds] = useState<Set<CableKind>>(
+    () => new Set(availableKinds.slice(0, 1)),
+  )
   const [label, setLabel] = useState('')
 
   useEffect(() => {
-    if (availableKinds.length > 0 && !availableKinds.includes(kind)) {
-      setKind(availableKinds[0])
-    }
+    setKinds((prev) => {
+      const filtered = new Set([...prev].filter((k) => availableKinds.includes(k)))
+      return filtered.size > 0 ? filtered : new Set(availableKinds.slice(0, 1))
+    })
   }, [availableKinds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canConfirm = availableKinds.includes(kind)
+  const toggleKind = (k: CableKind) => {
+    if (usedKinds.has(k)) return
+    setKinds((prev) => {
+      const next = new Set(prev)
+      if (next.has(k)) {
+        next.delete(k)
+      } else {
+        next.add(k)
+      }
+      return next
+    })
+  }
+
+  const selectedKinds = [...kinds].filter((k) => availableKinds.includes(k))
+  const canConfirm = selectedKinds.length > 0
 
   const handleConfirm = () => {
     if (!canConfirm) return
-    onConfirm(kind, label.trim())
+    onConfirm(selectedKinds, label.trim())
     setLabel('')
   }
+
+  const addLabel = selectedKinds.length > 1 ? 'ADD CABLES' : 'ADD CABLE'
 
   return (
     <>
@@ -98,13 +117,13 @@ export function ConnectionTypeSheet({ pending, existingConnections, onConfirm, o
             <div className="flex gap-2">
               {CABLE_KINDS.map((k) => {
                 const disabled = usedKinds.has(k)
-                const active = kind === k && !disabled
+                const active = kinds.has(k) && !disabled
                 return (
                   <button
                     key={k}
                     type="button"
                     disabled={disabled}
-                    onClick={() => !disabled && setKind(k)}
+                    onClick={() => toggleKind(k)}
                     style={{
                       fontFamily: '"JetBrains Mono", monospace',
                       fontSize: 11,
@@ -163,6 +182,7 @@ export function ConnectionTypeSheet({ pending, existingConnections, onConfirm, o
               <button
                 type="button"
                 onClick={handleConfirm}
+                disabled={!canConfirm}
                 style={{
                   fontFamily: '"JetBrains Mono", monospace',
                   fontSize: 11,
@@ -174,11 +194,12 @@ export function ConnectionTypeSheet({ pending, existingConnections, onConfirm, o
                   border: 'none',
                   background: 'rgb(var(--ink))',
                   color: 'rgb(var(--paper))',
-                  cursor: 'pointer',
-                  boxShadow: '3px 3px 0 rgb(var(--accent))',
+                  cursor: canConfirm ? 'pointer' : 'not-allowed',
+                  opacity: canConfirm ? 1 : 0.4,
+                  boxShadow: canConfirm ? '3px 3px 0 rgb(var(--accent))' : 'none',
                 }}
               >
-                Add cable
+                {addLabel}
               </button>
               <button
                 type="button"

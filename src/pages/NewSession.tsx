@@ -452,9 +452,11 @@ function DevicesSection({
   const { armedDevice, pending, arm, complete, cancel: cancelArm, dismissPending } = useConnectionDrawing()
   const isArmed = armedDevice !== null
 
-  const handleConfirm = (kind: CableKind, label: string) => {
+  const handleConfirm = (kinds: CableKind[], label: string) => {
     if (!pending) return
-    onAddConnection({ fromName: pending.from, toName: pending.to, kind, label })
+    for (const kind of kinds) {
+      onAddConnection({ fromName: pending.from, toName: pending.to, kind, label })
+    }
     dismissPending()
   }
 
