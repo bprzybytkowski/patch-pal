@@ -674,6 +674,41 @@ export default function SessionDetailPage() {
               onRemoveConnection={(idx) => setEditConnections((prev) => prev.filter((_, i) => i !== idx))}
             />
 
+            {/* Live signal flow preview */}
+            {editConnections.length > 0 && editDevices.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2.5 font-mono text-[10px] tracking-[0.24em] uppercase text-ink-muted mb-3">
+                  <span>Signal flow</span>
+                  <span className="flex-1 h-px bg-rule" />
+                </div>
+                <div
+                  style={{
+                    background: 'rgba(0,0,0,0.025)',
+                    border: '1px dashed rgb(var(--rule))',
+                    borderRadius: 4,
+                    padding: '14px 16px 10px',
+                  }}
+                >
+                  <SignalFlow
+                    devices={editDevices.map((ed) => ({
+                      name: ed.device.name,
+                      role: ed.syncRole,
+                      type: ed.device.type,
+                      sync: ed.syncMode || null,
+                    }))}
+                    connections={editConnections.map((c) => ({
+                      from: c.fromName,
+                      to: c.toName,
+                      kind: c.kind,
+                      label: c.label,
+                    }))}
+                    theme={theme}
+                    compact={isMobile}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-4 pt-2 border-t border-dashed border-rule">
               <button
                 type="button"

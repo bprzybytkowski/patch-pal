@@ -287,6 +287,43 @@ describe('Session detail', () => {
     })
   })
 
+  describe('signal flow preview in edit mode', () => {
+    it('shows signal flow when session has devices and connections', async () => {
+      const session = makeSession({
+        session_devices: [
+          { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sync_mode: null, patch_notes: null, sort_order: 0, devices: PO },
+        ],
+      })
+      const conn = { id: 'c-1', session_id: 'sess-1', from_name: 'PO-33', to_name: 'OUT', kind: 'audio', label: '', sort_order: 0 }
+      mockFrom
+        .mockReturnValueOnce(makeSessionFetch(session) as never)
+        .mockReturnValueOnce(makeConnectionsFetch([conn]) as never)
+      renderDetail()
+      await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
+      // The "Signal flow" section heading and PO-33 device node should be visible in the edit form
+      expect(await screen.findAllByText(/signal flow/i)).not.toHaveLength(0)
+      expect(screen.getAllByText('PO-33').length).toBeGreaterThan(0)
+    })
+
+    it('does not show signal flow when session has no connections', async () => {
+      const session = makeSession({
+        session_devices: [
+          { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sync_mode: null, patch_notes: null, sort_order: 0, devices: PO },
+        ],
+      })
+      mockFrom
+        .mockReturnValueOnce(makeSessionFetch(session) as never)
+        .mockReturnValueOnce(makeConnectionsFetch([]) as never)
+      renderDetail()
+      await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
+      // "Edit session" heading is present but no signal flow section heading
+      expect(await screen.findByText(/edit session/i)).toBeInTheDocument()
+      // Only the view-mode "Signal flow" should be absent (edit form has no devices → no preview)
+      const sfHeadings = screen.queryAllByText(/^signal flow$/i)
+      expect(sfHeadings).toHaveLength(0)
+    })
+  })
+
   describe('device card drag transform', () => {
     const scalingTransform = {
       attributes: {} as never,
