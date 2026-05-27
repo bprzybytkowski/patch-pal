@@ -8,6 +8,8 @@ import { usePostHog } from '@posthog/react'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useToastStore } from '../store/toast'
+import { exportBackup, importBackup } from '../lib/backup'
+import { useAuthStore } from '../store/auth'
 import { DEVICE_TYPE_LABELS, type DeviceType } from './Devices'
 
 interface SessionDeviceRow {
@@ -457,7 +459,9 @@ export default function SessionsPage() {
   const [deviceCount, setDeviceCount] = useState<number | null>(null)
   const [fetchError, setFetchError] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [backupBusy, setBackupBusy] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
+  const user = useAuthStore((s) => s.user)
   const [query, setQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<Session | null>(null)
@@ -536,6 +540,42 @@ export default function SessionsPage() {
 
   const handleEdit = () => {
     if (activeSession) navigate(`/sessions/${activeSession.id}`, { state: { editing: true } })
+  }
+
+  const handleExport = async () => {
+    setBackupBusy(true)
+    try {
+      await exportBackup()
+      addToast({ message: 'Backup downloaded.', type: 'success' })
+    } catch {
+      addToast({ message: 'Export failed. Try again.', type: 'error' })
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !user) return
+    setBackupBusy(true)
+    try {
+      const result = await importBackup(file, user.id)
+      addToast({ message: `Imported ${result.sessionsAdded} session${result.sessionsAdded !== 1 ? 's' : ''} and ${result.devicesAdded} device${result.devicesAdded !== 1 ? 's' : ''}.`, type: 'success' })
+      supabase
+        .from('sessions')
+        .select('*, session_devices(*, devices(*))')
+        .order('created_at', { ascending: false })
+        .then(({ data }) => { if (data) setSessions(data as Session[]) })
+      supabase
+        .from('devices')
+        .select('id', { count: 'exact', head: true })
+        .then(({ count }) => setDeviceCount(count ?? 0))
+    } catch {
+      addToast({ message: 'Import failed. Make sure you\'re using a valid PatchPal backup file.', type: 'error' })
+    } finally {
+      setBackupBusy(false)
+    }
   }
 
   return (
@@ -722,6 +762,34 @@ export default function SessionsPage() {
                 onClick={() => handleCardClick(session)}
               />
             ))}
+          </div>
+
+          {/* Backup controls */}
+          <div
+            className="flex items-center gap-4 pt-4 mt-auto"
+            style={{ borderTop: '1px dashed rgb(var(--rule))' }}
+          >
+            <button
+              onClick={handleExport}
+              disabled={backupBusy}
+              className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink-muted hover:text-ink"
+              style={{ background: 'none', border: 'none', cursor: backupBusy ? 'not-allowed' : 'pointer', opacity: backupBusy ? 0.5 : 1, padding: 0 }}
+            >
+              ↓ export json
+            </button>
+            <label
+              className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink-muted hover:text-ink"
+              style={{ cursor: backupBusy ? 'not-allowed' : 'pointer', opacity: backupBusy ? 0.5 : 1 }}
+            >
+              ↑ import json
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={handleImport}
+                disabled={backupBusy}
+                style={{ display: 'none' }}
+              />
+            </label>
           </div>
         </section>
 
