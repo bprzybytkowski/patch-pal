@@ -7,6 +7,7 @@ import { MOOD_COLOR } from '../lib/moodColors'
 import { usePostHog } from '@posthog/react'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { useToastStore } from '../store/toast'
 import { DEVICE_TYPE_LABELS, type DeviceType } from './Devices'
 
 interface SessionDeviceRow {
@@ -453,7 +454,9 @@ function SessionCard({
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [deviceCount, setDeviceCount] = useState<number | null>(null)
+  const [fetchError, setFetchError] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const addToast = useToastStore((s) => s.addToast)
   const [query, setQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<Session | null>(null)
@@ -468,7 +471,8 @@ export default function SessionsPage() {
       .from('sessions')
       .select('*, session_devices(*, devices(*))')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { setFetchError(true); return }
         if (data) setSessions(data as Session[])
       })
     supabase
@@ -490,8 +494,8 @@ export default function SessionsPage() {
       .select('*, session_devices(*, devices(*))')
       .eq('id', activeId)
       .single()
-      .then(async ({ data }) => {
-        if (!data) return
+      .then(async ({ data, error }) => {
+        if (error || !data) { addToast({ message: 'Could not load session.', type: 'error' }); return }
         const { data: connData } = await supabase
           .from('session_connections')
           .select('*')
@@ -519,8 +523,9 @@ export default function SessionsPage() {
 
   const handleDelete = async () => {
     if (!activeSession) return
+    const { error } = await supabase.from('sessions').delete().eq('id', activeSession.id)
+    if (error) { addToast({ message: 'Could not delete session. Try again.', type: 'error' }); setConfirmingDelete(false); return }
     posthog.capture('session_deleted', { session_id: activeSession.id })
-    await supabase.from('sessions').delete().eq('id', activeSession.id)
     setSessions((prev) => prev.filter((s) => s.id !== activeSession.id))
     const remaining = sessions.filter((s) => s.id !== activeSession.id)
     setActiveId(remaining[0]?.id ?? null)
@@ -608,6 +613,13 @@ export default function SessionsPage() {
               width: '100%',
             }}
           />
+
+          {/* Fetch error */}
+          {fetchError && (
+            <p className="font-serif italic text-[14px] text-accent">
+              Could not load sessions. Check your connection and refresh.
+            </p>
+          )}
 
           {/* Section label */}
           {sessions.length > 0 && (

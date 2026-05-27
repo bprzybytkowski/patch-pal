@@ -12,8 +12,10 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
+import { useToastStore } from '../store/toast'
 import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
+import { ConfirmModal } from '../components/ConfirmModal'
 
 export type DeviceType =
   | 'pocket_operator'
@@ -324,8 +326,11 @@ export default function DevicesPage() {
   const posthog = usePostHog()
   const theme = useThemeStore((s) => s.theme)
   const [devices, setDevices] = useState<Device[]>([])
+  const [fetchError, setFetchError] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [addError, setAddError] = useState('')
+  const addToast = useToastStore((s) => s.addToast)
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     defaultValues: { name: '', type: 'pocket_operator', manufacturer: '', notes: '' },
@@ -337,7 +342,8 @@ export default function DevicesPage() {
       .from('devices')
       .select('*')
       .order('created_at', { ascending: true })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { setFetchError(true); return }
         if (data) setDevices(data as Device[])
       })
   }, [])
@@ -363,7 +369,7 @@ export default function DevicesPage() {
   })
 
   const handleEdit = async (values: FormValues, deviceId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('devices')
       .update({
         name: values.name.trim(),
@@ -373,18 +379,18 @@ export default function DevicesPage() {
       })
       .eq('id', deviceId)
       .select()
-    if (data) {
-      posthog.capture('device_updated', { device_id: deviceId, device_type: values.type })
-      setDevices((prev) => prev.map((d) => (d.id === deviceId ? (data[0] as Device) : d)))
-      setEditingId(null)
-    }
+    if (error || !data) { addToast({ message: 'Could not save changes. Try again.', type: 'error' }); return }
+    posthog.capture('device_updated', { device_id: deviceId, device_type: values.type })
+    setDevices((prev) => prev.map((d) => (d.id === deviceId ? (data[0] as Device) : d)))
+    setEditingId(null)
   }
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this device?')) return
+    const { error } = await supabase.from('devices').delete().eq('id', id)
+    if (error) { addToast({ message: 'Could not delete device. Try again.', type: 'error' }); setDeletingId(null); return }
     posthog.capture('device_deleted', { device_id: id })
-    await supabase.from('devices').delete().eq('id', id)
     setDevices((prev) => prev.filter((d) => d.id !== id))
+    setDeletingId(null)
   }
 
   const fieldStyle: React.CSSProperties = {
@@ -402,6 +408,14 @@ export default function DevicesPage() {
 
   return (
     <div data-testid="devices-page" className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">
+      {deletingId && (
+        <ConfirmModal
+          message="Delete this device? It will be removed from all sessions."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(deletingId)}
+          onCancel={() => setDeletingId(null)}
+        />
+      )}
       {/* Add device form */}
       <div
         className="rounded-[4px] p-[28px_30px_28px] mb-8"
@@ -540,7 +554,12 @@ export default function DevicesPage() {
       </div>
 
       <div className="flex flex-col gap-4">
-        {devices.length === 0 && (
+        {fetchError && (
+          <p className="font-serif italic text-[14px] text-accent">
+            Could not load devices. Check your connection and refresh.
+          </p>
+        )}
+        {!fetchError && devices.length === 0 && (
           <p className="font-serif italic text-[14px] text-ink-muted">No devices yet.</p>
         )}
         {devices.map((device, i) =>
@@ -557,7 +576,7 @@ export default function DevicesPage() {
               device={device}
               isFirst={i === 0}
               onEdit={(d) => setEditingId(d.id)}
-              onDelete={handleDelete}
+              onDelete={(id) => setDeletingId(id)}
             />
           ),
         )}
