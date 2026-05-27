@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
@@ -13,6 +13,7 @@ import { uploadDevicePhoto, deleteDevicePhoto } from '../lib/photos'
 import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
+import { PhotoSourceSheet } from '../components/PhotoSourceSheet'
 import { useAuthStore } from '../store/auth'
 import { useToastStore } from '../store/toast'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -945,6 +946,9 @@ function EditDeviceCard({
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: editDevice.deviceId })
   const addToast = useToastStore((s) => s.addToast)
   const [uploading, setUploading] = useState(false)
+  const [showPhotoSheet, setShowPhotoSheet] = useState(false)
+  const cameraInputRef = React.useRef<HTMLInputElement>(null)
+  const galleryInputRef = React.useRef<HTMLInputElement>(null)
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -965,6 +969,18 @@ function EditDeviceCard({
     if (!editDevice.photoUrl) return
     onChange({ photoUrl: undefined })
     await deleteDevicePhoto(editDevice.photoUrl)
+  }
+
+  const handlePhotoButtonClick = () => setShowPhotoSheet(true)
+
+  const handlePickCamera = () => {
+    setShowPhotoSheet(false)
+    cameraInputRef.current?.click()
+  }
+
+  const handlePickGallery = () => {
+    setShowPhotoSheet(false)
+    galleryInputRef.current?.click()
   }
 
   return (
@@ -1111,12 +1127,26 @@ function EditDeviceCard({
           </button>
         </div>
       ) : (
-        <label style={{ display: 'block', cursor: uploading ? 'default' : 'pointer' }}>
-          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={handlePhotoChange} />
-          <span style={{ display: 'block', textAlign: 'center', padding: '5px 10px', border: '1px dashed rgb(var(--rule))', borderRadius: 2, fontFamily: '"JetBrains Mono", monospace', fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgb(var(--ink-muted))', opacity: uploading ? 0.5 : 1 }}>
+        <>
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} disabled={uploading} onChange={handlePhotoChange} />
+          <input ref={galleryInputRef} type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={handlePhotoChange} />
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={handlePhotoButtonClick}
+            aria-label="⊕ photo"
+            style={{ display: 'block', width: '100%', textAlign: 'center', padding: '5px 10px', border: '1px dashed rgb(var(--rule))', borderRadius: 2, background: 'transparent', cursor: uploading ? 'default' : 'pointer', fontFamily: '"JetBrains Mono", monospace', fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgb(var(--ink-muted))', opacity: uploading ? 0.5 : 1 }}
+          >
             {uploading ? 'uploading…' : '⊕ photo'}
-          </span>
-        </label>
+          </button>
+          {showPhotoSheet && (
+            <PhotoSourceSheet
+              onCamera={handlePickCamera}
+              onGallery={handlePickGallery}
+              onCancel={() => setShowPhotoSheet(false)}
+            />
+          )}
+        </>
       )}
 
       {/* Connection strip */}

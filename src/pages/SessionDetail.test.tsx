@@ -2,12 +2,19 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import * as photos from '../lib/photos'
 import SessionDetailPage from './SessionDetail'
 
 vi.mock('../lib/supabase', () => ({ supabase: { from: vi.fn() } }))
+vi.mock('../lib/photos', () => ({
+  uploadDevicePhoto: vi.fn().mockResolvedValue('https://example.com/photo.jpg'),
+  deleteDevicePhoto: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('../store/auth', () => ({
   useAuthStore: (sel: (s: { user: { id: string } }) => unknown) => sel({ user: { id: 'user-1' } }),
 }))
+
+const mockUploadDevicePhoto = vi.mocked(photos.uploadDevicePhoto)
 
 const mockFrom = vi.mocked(supabase.from)
 const mockNavigate = vi.fn()
@@ -205,5 +212,64 @@ describe('Session detail', () => {
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
     expect(await screen.findByRole('button', { name: /drag to reorder/i })).toBeInTheDocument()
+  })
+
+  function makeSessionWithDevice() {
+    return makeSession({
+      session_devices: [
+        { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sync_mode: null, patch_notes: null, sort_order: 0, devices: PO },
+      ],
+    })
+  }
+
+  async function openEditWithDevice() {
+    mockFrom
+      .mockReturnValueOnce(makeSessionFetch(makeSessionWithDevice()) as never)
+      .mockReturnValueOnce(makeConnectionsFetch() as never)
+    renderDetail()
+    await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
+  }
+
+  describe('⊕ photo button', () => {
+    it('clicking photo button shows sheet with Camera and Gallery options', async () => {
+      await openEditWithDevice()
+      await userEvent.click(await screen.findByRole('button', { name: /⊕ photo/i }))
+      expect(await screen.findByRole('button', { name: /camera/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /gallery/i })).toBeInTheDocument()
+    })
+
+    it('picking Gallery dismisses sheet and uploads via gallery input', async () => {
+      await openEditWithDevice()
+      await userEvent.click(await screen.findByRole('button', { name: /⊕ photo/i }))
+      await userEvent.click(await screen.findByRole('button', { name: /gallery/i }))
+      expect(screen.queryByRole('button', { name: /gallery/i })).not.toBeInTheDocument()
+      const file = new File(['img'], 'patch.jpg', { type: 'image/jpeg' })
+      const galleryInput = document.querySelector<HTMLInputElement>('input[type="file"]:not([capture])')!
+      await userEvent.upload(galleryInput, file)
+      expect(mockUploadDevicePhoto).toHaveBeenCalledWith(file, 'user-1')
+    })
+
+    it('picking Camera dismisses sheet and uploads via camera input', async () => {
+      await openEditWithDevice()
+      await userEvent.click(await screen.findByRole('button', { name: /⊕ photo/i }))
+      await userEvent.click(await screen.findByRole('button', { name: /camera/i }))
+      expect(screen.queryByRole('button', { name: /camera/i })).not.toBeInTheDocument()
+      const file = new File(['img'], 'shot.jpg', { type: 'image/jpeg' })
+      const cameraInput = document.querySelector<HTMLInputElement>('input[type="file"][capture]')!
+      await userEvent.upload(cameraInput, file)
+      expect(mockUploadDevicePhoto).toHaveBeenCalledWith(file, 'user-1')
+    })
+
+    it('cancel dismisses sheet without upload', async () => {
+      await openEditWithDevice()
+      await userEvent.click(await screen.findByRole('button', { name: /⊕ photo/i }))
+      // Find cancel button inside the sheet (after sheet appears)
+      const galleryBtn = await screen.findByRole('button', { name: /gallery/i })
+      const sheet = galleryBtn.closest('[style*="position: fixed"]')!
+      const cancelBtn = Array.from(sheet.querySelectorAll('button')).find(b => /cancel/i.test(b.textContent ?? ''))!
+      await userEvent.click(cancelBtn)
+      expect(screen.queryByRole('button', { name: /gallery/i })).not.toBeInTheDocument()
+      expect(mockUploadDevicePhoto).not.toHaveBeenCalled()
+    })
   })
 })
