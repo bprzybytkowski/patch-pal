@@ -62,6 +62,7 @@ describe('New session form', () => {
     renderNewSession()
     expect(await screen.findByLabelText(/title/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/bpm/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /more options/i }))
     expect(screen.getByLabelText(/key \/ scale/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/ableton project/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/notes/i)).toBeInTheDocument()
@@ -71,7 +72,8 @@ describe('New session form', () => {
 
   it('submitting without a title shows a required error', async () => {
     renderNewSession()
-    await screen.findByLabelText(/title/i)
+    const titleInput = await screen.findByLabelText(/title/i)
+    await userEvent.clear(titleInput)
     await userEvent.click(screen.getByRole('button', { name: /save session/i }))
     expect(await screen.findByText(/title is required/i)).toBeInTheDocument()
   })
@@ -88,6 +90,7 @@ describe('New session form', () => {
   it('renders predefined mood chip buttons', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
+    await userEvent.click(screen.getByRole('button', { name: /more options/i }))
     expect(screen.getByRole('button', { name: /^dark$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^ambient$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^lo-fi$/i })).toBeInTheDocument()
@@ -96,6 +99,7 @@ describe('New session form', () => {
   it('clicking a mood chip selects it; clicking again deselects it', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
+    await userEvent.click(screen.getByRole('button', { name: /more options/i }))
     const darkChip = screen.getByRole('button', { name: /^dark$/i })
     await userEvent.click(darkChip)
     expect(screen.getByRole('button', { name: /^dark$/i })).toBeInTheDocument()
@@ -106,6 +110,7 @@ describe('New session form', () => {
   it('all 10 predefined mood chips are rendered', async () => {
     renderNewSession()
     await screen.findByLabelText(/title/i)
+    await userEvent.click(screen.getByRole('button', { name: /more options/i }))
     const moodChips = ['dark', 'hypnotic', 'ambient', 'playful', 'broken', 'noisy', 'experimental', 'melancholic', 'energetic', 'lo-fi']
     for (const chip of moodChips) {
       expect(screen.getByRole('button', { name: new RegExp(`^${chip}$`, 'i') })).toBeInTheDocument()

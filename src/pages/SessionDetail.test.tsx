@@ -107,22 +107,22 @@ describe('Session detail', () => {
   })
 
   it('Delete with confirm removes the session and redirects to /sessions', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     mockFrom
       .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
       .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /burn it/i }))
     expect(mockNavigate).toHaveBeenCalledWith('/sessions')
   })
 
-  it('Delete with confirm=false does not delete', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+  it('Delete with cancel does not delete', async () => {
     mockFrom
       .mockReturnValueOnce(makeSessionFetch(makeSession()) as never)
       .mockReturnValueOnce(makeConnectionsFetch() as never)
     renderDetail()
     await userEvent.click(await screen.findByRole('button', { name: /burn this page/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /cancel/i }))
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 

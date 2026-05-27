@@ -64,7 +64,7 @@ describe('Auth page', () => {
     expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument()
   })
 
-  it('sign-up with already registered email shows error', async () => {
+  it('sign-up with already registered email shows inbox confirmation (enumeration-safe)', async () => {
     const { supabase } = await import('../lib/supabase')
     vi.mocked(supabase.auth.signUp).mockResolvedValue({
       data: { user: { identities: [] }, session: null },
@@ -78,7 +78,7 @@ describe('Auth page', () => {
     await userEvent.type(screen.getByLabelText('Confirm password'), 'securepass')
     await userEvent.click(screen.getByRole('button', { name: /start journaling/i }))
 
-    expect(await screen.findByText(/already exists/i)).toBeInTheDocument()
+    expect(await screen.findByText(/check your inbox/i)).toBeInTheDocument()
   })
 
   it('clicking Forgot password shows reset form', async () => {

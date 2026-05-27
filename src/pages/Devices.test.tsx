@@ -126,13 +126,13 @@ describe('Devices page', () => {
   })
 
   it('clicking Delete (confirmed) removes the device from the list', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     mockFrom
       .mockReturnValueOnce(makeLoadMock([existingDevice]) as never)
       .mockReturnValueOnce(makeDeleteMock() as never)
 
     render(<DevicesPage />)
     await userEvent.click(await screen.findByRole('button', { name: /delete/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^delete$/i }))
 
     expect(await screen.findByText(/no devices/i)).toBeInTheDocument()
   })

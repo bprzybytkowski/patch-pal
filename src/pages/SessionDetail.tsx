@@ -11,6 +11,7 @@ import { useThemeStore } from '../store/theme'
 import { useMediaQuery, useConnectionDrawing } from '../lib/hooks'
 import { uploadDevicePhoto, deleteDevicePhoto } from '../lib/photos'
 import { MOOD_COLOR } from '../lib/moodColors'
+import { updateAudioOutForReorder } from '../lib/sessionDevices'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet'
@@ -658,7 +659,17 @@ export default function SessionDetailPage() {
               ])}
               onRemove={(idx) => setEditDevices((prev) => prev.filter((_, i) => i !== idx))}
               onChange={(idx, patch) => setEditDevices((prev) => prev.map((ed, i) => i === idx ? { ...ed, ...patch } : ed))}
-              onReorder={(from, to) => setEditDevices((prev) => arrayMove(prev, from, to))}
+              onReorder={(from, to) => {
+                const reordered = arrayMove(editDevices, from, to)
+                setEditDevices(reordered)
+                const oldLastName = editDevices[editDevices.length - 1]?.device.name
+                const newLastName = reordered[reordered.length - 1]?.device.name
+                if (oldLastName && newLastName && oldLastName !== newLastName) {
+                  setEditConnections((prev) =>
+                    updateAudioOutForReorder(prev, oldLastName, newLastName),
+                  )
+                }
+              }}
               onAddConnection={(c) => setEditConnections((prev) => [...prev, c])}
               onRemoveConnection={(idx) => setEditConnections((prev) => prev.filter((_, i) => i !== idx))}
             />

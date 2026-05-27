@@ -12,6 +12,7 @@ import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
 import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type CableKind } from '../components/SignalFlow'
+import { updateAudioOutForReorder } from '../lib/sessionDevices'
 import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
 import { useConnectionDrawing } from '../lib/hooks'
 import { uploadDevicePhoto, deleteDevicePhoto } from '../lib/photos'
@@ -457,16 +458,9 @@ export default function NewSessionPage() {
                 const oldLast = devices.find((d) => d.id === oldLastId)
                 const newLast = devices.find((d) => d.id === newLastId)
                 if (oldLast && newLast) {
-                  setSessionConnections((prev) => {
-                    const hasOldOut = prev.some(
-                      (c) => c.fromName === oldLast.name && c.toName === 'OUT' && c.kind === 'audio',
-                    )
-                    if (!hasOldOut) return prev
-                    return [
-                      ...prev.filter((c) => !(c.fromName === oldLast.name && c.toName === 'OUT' && c.kind === 'audio')),
-                      { fromName: newLast.name, toName: 'OUT', kind: 'audio', label: '' },
-                    ]
-                  })
+                  setSessionConnections((prev) =>
+                    updateAudioOutForReorder(prev, oldLast.name, newLast.name),
+                  )
                 }
               }
             }}
