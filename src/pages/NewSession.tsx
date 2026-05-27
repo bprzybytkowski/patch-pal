@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
@@ -6,6 +6,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/auth'
+import { useToastStore } from '../store/toast'
 import { type Device } from './Devices'
 import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
@@ -84,27 +85,74 @@ function getDefaultTitle(): string {
   return 'Late Night Session'
 }
 
+const DRAFT_KEY = 'patchpal_new_session_draft'
+
+interface DraftState {
+  fields: MetaFields
+  sessionDevices: SessionDevice[]
+  sessionConnections: SessionConnection[]
+  tags: string[]
+}
+
+function loadDraft(): DraftState | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    return raw ? (JSON.parse(raw) as DraftState) : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(draft: DraftState) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {}
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY)
+}
+
 export default function NewSessionPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const forkState = location.state as ForkState | null
   const user = useAuthStore((s) => s.user)
+  const addToast = useToastStore((s) => s.addToast)
   const posthog = usePostHog()
   const theme = useThemeStore((s) => s.theme)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<MetaFields>({
-    defaultValues: forkState?.prefill ?? { title: getDefaultTitle(), bpm: '', key_scale: '', ableton_project: '', notes: '' },
+  const draftRef = useRef<DraftState | null>(!forkState ? loadDraft() : null)
+  const draft = draftRef.current
+
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<MetaFields>({
+    defaultValues: forkState?.prefill ?? draft?.fields ?? { title: getDefaultTitle(), bpm: '', key_scale: '', ableton_project: '', notes: '' },
   })
 
   const [devices, setDevices] = useState<Device[]>([])
   const [sessionDevices, setSessionDevices] = useState<SessionDevice[]>(
-    forkState?.prefill?.devices ?? [],
+    forkState?.prefill?.devices ?? draft?.sessionDevices ?? [],
   )
   const [sessionConnections, setSessionConnections] = useState<SessionConnection[]>(
-    forkState?.prefill?.connections ?? [],
+    forkState?.prefill?.connections ?? draft?.sessionConnections ?? [],
   )
-  const [tags, setTags] = useState<string[]>(forkState?.prefill?.mood_tags ?? [])
+  const [tags, setTags] = useState<string[]>(forkState?.prefill?.mood_tags ?? draft?.tags ?? [])
   const [showMore, setShowMore] = useState(false)
+
+  useEffect(() => {
+    if (draft) addToast({ message: 'Draft restored', type: 'success' })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const formValues = watch()
+
+  useEffect(() => {
+    if (forkState) return
+    if (!formValues.bpm && !formValues.title) return
+    const timer = setTimeout(() => {
+      saveDraft({ fields: formValues, sessionDevices, sessionConnections, tags })
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [formValues, sessionDevices, sessionConnections, tags, forkState])
 
   useEffect(() => {
     supabase
@@ -115,7 +163,7 @@ export default function NewSessionPage() {
         if (data) {
           const devList = data as Device[]
           setDevices(devList)
-          if (!forkState && devList.length > 0 && devList.length <= 5) {
+          if (!forkState && !draft && devList.length > 0 && devList.length <= 5) {
             setSessionDevices(
               devList.map((d) => ({ deviceId: d.id, syncRole: 'standalone' as const, syncMode: '', patchNotes: '' })),
             )
@@ -134,55 +182,69 @@ export default function NewSessionPage() {
   const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag))
 
   const onSubmit = async (values: MetaFields) => {
-    const bpm = values.bpm ? parseInt(values.bpm) : null
-    const { data } = await supabase
-      .from('sessions')
-      .insert({
-        user_id: user!.id,
-        title: values.title.trim(),
-        bpm,
-        key_scale: values.key_scale.trim() || null,
-        ableton_project: values.ableton_project.trim() || null,
-        notes: values.notes.trim() || null,
-        mood_tags: tags,
-        forked_from: forkState?.forkedFrom ?? null,
+    try {
+      const bpm = values.bpm ? parseInt(values.bpm) : null
+      const { data, error } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: user!.id,
+          title: values.title.trim(),
+          bpm,
+          key_scale: values.key_scale.trim() || null,
+          ableton_project: values.ableton_project.trim() || null,
+          notes: values.notes.trim() || null,
+          mood_tags: tags,
+          forked_from: forkState?.forkedFrom ?? null,
+        })
+        .select()
+      if (error || !data) {
+        addToast({ message: 'Failed to save session. Please try again.', type: 'error' })
+        return
+      }
+      if (sessionDevices.length > 0) {
+        const { error: devErr } = await supabase.from('session_devices').insert(
+          sessionDevices.map((sd, i) => ({
+            session_id: data[0].id,
+            device_id: sd.deviceId,
+            sync_role: sd.syncRole,
+            sync_mode: sd.syncMode || null,
+            patch_notes: sd.patchNotes || null,
+            sort_order: i,
+          })),
+        )
+        if (devErr) {
+          addToast({ message: 'Session saved but devices could not be attached.', type: 'error' })
+        }
+      }
+      if (sessionConnections.length > 0) {
+        const { error: connErr } = await supabase.from('session_connections').insert(
+          sessionConnections.map((c, i) => ({
+            session_id: data[0].id,
+            from_name: c.fromName,
+            to_name: c.toName,
+            kind: c.kind,
+            label: c.label,
+            sort_order: i,
+          })),
+        )
+        if (connErr) {
+          addToast({ message: 'Session saved but signal flow could not be saved.', type: 'error' })
+        }
+      }
+      clearDraft()
+      posthog.capture('session_created', {
+        session_id: data[0].id,
+        has_bpm: bpm !== null,
+        has_key_scale: !!values.key_scale.trim(),
+        device_count: sessionDevices.length,
+        connection_count: sessionConnections.length,
+        tag_count: tags.length,
+        is_fork: !!forkState?.forkedFrom,
       })
-      .select()
-    if (!data) return
-    if (sessionDevices.length > 0) {
-      await supabase.from('session_devices').insert(
-        sessionDevices.map((sd, i) => ({
-          session_id: data[0].id,
-          device_id: sd.deviceId,
-          sync_role: sd.syncRole,
-          sync_mode: sd.syncMode || null,
-          patch_notes: sd.patchNotes || null,
-          sort_order: i,
-        })),
-      )
+      navigate('/sessions')
+    } catch {
+      addToast({ message: 'Failed to save session. Check your connection and try again.', type: 'error' })
     }
-    if (sessionConnections.length > 0) {
-      await supabase.from('session_connections').insert(
-        sessionConnections.map((c, i) => ({
-          session_id: data[0].id,
-          from_name: c.fromName,
-          to_name: c.toName,
-          kind: c.kind,
-          label: c.label,
-          sort_order: i,
-        })),
-      )
-    }
-    posthog.capture('session_created', {
-      session_id: data[0].id,
-      has_bpm: bpm !== null,
-      has_key_scale: !!values.key_scale.trim(),
-      device_count: sessionDevices.length,
-      connection_count: sessionConnections.length,
-      tag_count: tags.length,
-      is_fork: !!forkState?.forkedFrom,
-    })
-    navigate('/sessions')
   }
 
   return (
@@ -469,6 +531,7 @@ export default function NewSessionPage() {
             </button>
             <Link
               to="/sessions"
+              onClick={clearDraft}
               className="font-serif italic text-[14px] text-ink-soft underline"
             >
               cancel
