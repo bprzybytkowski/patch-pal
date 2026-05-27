@@ -7,10 +7,20 @@ import { router } from './router'
 import { ToastContainer } from './components/Toast'
 
 function ThemeSync() {
-  const theme = useThemeStore((s) => s.theme)
+  const { theme, setTheme } = useThemeStore((s) => ({ theme: s.theme, setTheme: s.setTheme }))
+
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-color-scheme: dark)')
+    setTheme(mql.matches ? 'dark' : 'light')
+    const handler = (e: MediaQueryListEvent) => setTheme(e.matches ? 'dark' : 'light')
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [setTheme])
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
+
   return null
 }
 
