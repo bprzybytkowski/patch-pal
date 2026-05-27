@@ -564,7 +564,7 @@ export default function SessionDetailPage() {
               <input id="key_scale" style={fieldInputStyle} {...register('key_scale')} />
             </FieldInput>
 
-            <FieldInput label="Ableton project" id="ableton_project">
+            <FieldInput label="DAW project" id="ableton_project">
               <input id="ableton_project" style={fieldInputStyle} {...register('ableton_project')} />
             </FieldInput>
 

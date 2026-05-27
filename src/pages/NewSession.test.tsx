@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import * as photos from '../lib/photos'
 import NewSessionPage from './NewSession'
 
 vi.mock('../lib/supabase', () => ({ supabase: { from: vi.fn(), auth: { getUser: vi.fn() } } }))
@@ -10,9 +11,14 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 vi.mock('../store/auth', () => ({ useAuthStore: (sel: (s: { user: { id: string } }) => unknown) => sel({ user: { id: 'user-1' } }) }))
+vi.mock('../lib/photos', () => ({
+  uploadDevicePhoto: vi.fn().mockResolvedValue('https://example.com/photo.jpg'),
+  deleteDevicePhoto: vi.fn().mockResolvedValue(undefined),
+}))
 
 const mockNavigate = vi.fn()
 const mockFrom = vi.mocked(supabase.from)
+const mockUploadDevicePhoto = vi.mocked(photos.uploadDevicePhoto)
 
 function makeDevicesFetch(devices: unknown[] = []) {
   return {
@@ -64,7 +70,7 @@ describe('New session form', () => {
     expect(screen.getByLabelText(/bpm/i)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /more options/i }))
     expect(screen.getByLabelText(/key \/ scale/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/ableton project/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/daw project/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/notes/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save session/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /cancel/i })).toBeInTheDocument()
@@ -232,5 +238,54 @@ describe('New session form', () => {
     expect(screen.getByDisplayValue('bass patch')).toBeInTheDocument()
     const masterBtn = screen.getByRole('button', { name: /master/i })
     expect(masterBtn).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  describe('⊕ photo button', () => {
+    async function addDevice() {
+      // 1 device (≤5) is auto-added to the session on load — no need to open the picker
+      mockFrom.mockReturnValue(makeDevicesFetch([PO]) as never)
+      renderNewSession()
+      await screen.findByRole('button', { name: /⊕ photo/i })
+    }
+
+    it('clicking photo button shows sheet with Camera and Gallery options', async () => {
+      await addDevice()
+      await userEvent.click(screen.getByRole('button', { name: /⊕ photo/i }))
+      expect(await screen.findByRole('button', { name: /camera/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /gallery/i })).toBeInTheDocument()
+    })
+
+    it('picking Gallery dismisses sheet and uploads via gallery input', async () => {
+      await addDevice()
+      await userEvent.click(screen.getByRole('button', { name: /⊕ photo/i }))
+      await userEvent.click(await screen.findByRole('button', { name: /gallery/i }))
+      expect(screen.queryByRole('button', { name: /gallery/i })).not.toBeInTheDocument()
+      const file = new File(['img'], 'patch.jpg', { type: 'image/jpeg' })
+      const galleryInput = document.querySelector<HTMLInputElement>('input[type="file"]:not([capture])')!
+      await userEvent.upload(galleryInput, file)
+      expect(mockUploadDevicePhoto).toHaveBeenCalledWith(file, 'user-1')
+    })
+
+    it('picking Camera dismisses sheet and uploads via camera input', async () => {
+      await addDevice()
+      await userEvent.click(screen.getByRole('button', { name: /⊕ photo/i }))
+      await userEvent.click(await screen.findByRole('button', { name: /camera/i }))
+      expect(screen.queryByRole('button', { name: /camera/i })).not.toBeInTheDocument()
+      const file = new File(['img'], 'shot.jpg', { type: 'image/jpeg' })
+      const cameraInput = document.querySelector<HTMLInputElement>('input[type="file"][capture]')!
+      await userEvent.upload(cameraInput, file)
+      expect(mockUploadDevicePhoto).toHaveBeenCalledWith(file, 'user-1')
+    })
+
+    it('cancel dismisses sheet without upload', async () => {
+      await addDevice()
+      await userEvent.click(screen.getByRole('button', { name: /⊕ photo/i }))
+      const galleryBtn = await screen.findByRole('button', { name: /gallery/i })
+      const sheet = galleryBtn.closest('[style*="position: fixed"]')!
+      const cancelBtn = Array.from(sheet.querySelectorAll('button')).find(b => /cancel/i.test(b.textContent ?? ''))!
+      await userEvent.click(cancelBtn)
+      expect(screen.queryByRole('button', { name: /gallery/i })).not.toBeInTheDocument()
+      expect(mockUploadDevicePhoto).not.toHaveBeenCalled()
+    })
   })
 })
