@@ -13,6 +13,7 @@ import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
 import { useAuthStore } from '../store/auth'
+import { useToastStore } from '../store/toast'
 import { ConfirmModal } from '../components/ConfirmModal'
 
 const CABLE_KIND_COLORS: Record<CableKind, string> = {
@@ -193,9 +194,11 @@ export default function SessionDetailPage() {
   const user = useAuthStore((s) => s.user)
 
   const [session, setSession] = useState<Session | null>(null)
+  const [fetchError, setFetchError] = useState(false)
   const [nextTakeId, setNextTakeId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const addToast = useToastStore((s) => s.addToast)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [editConnections, setEditConnections] = useState<{ fromName: string; toName: string; kind: CableKind; label: string }[]>([])
@@ -217,8 +220,8 @@ export default function SessionDetailPage() {
       .select('*, session_devices(*, devices(*))')
       .eq('id', id)
       .single()
-      .then(async ({ data }) => {
-        if (!data) return
+      .then(async ({ data, error }) => {
+        if (error || !data) { setFetchError(true); return }
         const { data: connData } = await supabase
           .from('session_connections')
           .select('*')
@@ -271,7 +274,8 @@ export default function SessionDetailPage() {
         device: sd.devices,
       })),
     )
-    supabase.from('devices').select('*').eq('user_id', user!.id).then(({ data }) => {
+    supabase.from('devices').select('*').eq('user_id', user!.id).then(({ data, error }) => {
+      if (error) { addToast({ message: 'Could not load devices for editing.', type: 'error' }); return }
       setAllDevices((data as Device[]) ?? [])
     })
     setEditing(true)
@@ -308,16 +312,19 @@ export default function SessionDetailPage() {
       version: session?.version ?? 1,
     }
     const { error } = await supabase.from('sessions').update(updatedFields).eq('id', id)
-    if (error) return
+    if (error) { addToast({ message: 'Could not save changes. Try again.', type: 'error' }); return }
 
-    await supabase.from('session_connections').delete().eq('session_id', id)
-    if (editConnections.length > 0) {
-      await supabase.from('session_connections').insert(buildConnectionRows(id!))
+    const { error: connDelErr } = await supabase.from('session_connections').delete().eq('session_id', id)
+    if (connDelErr) { addToast({ message: 'Saved session but could not update signal flow.', type: 'error' }) }
+    else if (editConnections.length > 0) {
+      const { error: connInsErr } = await supabase.from('session_connections').insert(buildConnectionRows(id!))
+      if (connInsErr) addToast({ message: 'Saved session but could not update signal flow.', type: 'error' })
     }
 
-    await supabase.from('session_devices').delete().eq('session_id', id)
-    if (editDevices.length > 0) {
-      await supabase.from('session_devices').insert(
+    const { error: devDelErr } = await supabase.from('session_devices').delete().eq('session_id', id)
+    if (devDelErr) { addToast({ message: 'Saved session but could not update devices.', type: 'error' }) }
+    else if (editDevices.length > 0) {
+      const { error: devInsErr } = await supabase.from('session_devices').insert(
         editDevices.map((ed, i) => ({
           session_id: id,
           device_id: ed.deviceId,
@@ -327,6 +334,7 @@ export default function SessionDetailPage() {
           sort_order: i,
         })),
       )
+      if (devInsErr) addToast({ message: 'Saved session but could not update devices.', type: 'error' })
     }
 
     posthog.capture('session_updated', { session_id: id })
@@ -361,7 +369,7 @@ export default function SessionDetailPage() {
 
   const onSaveAsNewTake = handleSubmit(async (values) => {
     if (!user || !session) return
-    const { data: newRows } = await supabase
+    const { data: newRows, error: forkErr } = await supabase
       .from('sessions')
       .insert({
         user_id: user.id,
@@ -375,11 +383,11 @@ export default function SessionDetailPage() {
         version: (session.version ?? 1) + 1,
       })
       .select()
-    if (!newRows?.[0]) return
+    if (forkErr || !newRows?.[0]) { addToast({ message: 'Could not save new take. Try again.', type: 'error' }); return }
     const newId = newRows[0].id
 
     if (editDevices.length > 0) {
-      await supabase.from('session_devices').insert(
+      const { error: devErr } = await supabase.from('session_devices').insert(
         editDevices.map((ed, i) => ({
           session_id: newId,
           device_id: ed.deviceId,
@@ -389,9 +397,11 @@ export default function SessionDetailPage() {
           sort_order: i,
         })),
       )
+      if (devErr) addToast({ message: 'Saved new take but could not attach devices.', type: 'error' })
     }
     if (editConnections.length > 0) {
-      await supabase.from('session_connections').insert(buildConnectionRows(newId))
+      const { error: connErr } = await supabase.from('session_connections').insert(buildConnectionRows(newId))
+      if (connErr) addToast({ message: 'Saved new take but could not attach signal flow.', type: 'error' })
     }
 
     posthog.capture('session_created', { session_id: newId, is_fork: true })
@@ -401,10 +411,22 @@ export default function SessionDetailPage() {
   })
 
   const handleDelete = async () => {
+    const { error } = await supabase.from('sessions').delete().eq('id', id)
+    if (error) { addToast({ message: 'Could not delete session. Try again.', type: 'error' }); setConfirmingDelete(false); return }
     posthog.capture('session_deleted', { session_id: id })
-    await supabase.from('sessions').delete().eq('id', id)
     navigate('/sessions')
   }
+
+  if (fetchError) return (
+    <div className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">
+      <p className="font-serif italic text-[14px] text-accent">
+        Could not load this session. Check your connection and{' '}
+        <button onClick={() => window.location.reload()} className="underline" style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+          refresh
+        </button>.
+      </p>
+    </div>
+  )
 
   if (!session) return null
 
