@@ -1,15 +1,15 @@
 import { useToastStore, type Toast } from '../store/toast'
 
 function ToastItem({ toast }: { toast: Toast }) {
-  const borderClass =
-    toast.type === 'success' ? 'border-l-indigo-500' : 'border-l-red-500'
+  const borderClass = toast.type === 'success' ? 'border-l-ink-muted' : 'border-l-accent'
 
   return (
     <div
       data-type={toast.type}
-      className={`bg-zinc-800 border-l-4 ${borderClass} rounded-md px-4 py-3 text-sm text-zinc-100 shadow-lg`}
+      className={`bg-ink border-l-4 ${borderClass} rounded-[2px] px-4 py-3`}
+      style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.25)' }}
     >
-      {toast.message}
+      <p className="font-serif italic text-[14px] text-paper leading-snug">{toast.message}</p>
     </div>
   )
 }

@@ -29,21 +29,23 @@ describe('ToastContainer', () => {
     expect(screen.getByText('Toast 4')).toBeInTheDocument()
   })
 
-  it('success toast has indigo left border', () => {
+  it('success toast has muted left border', () => {
     act(() => {
       useToastStore.getState().addToast({ message: 'OK', type: 'success' })
     })
     render(<ToastContainer />)
     const toast = screen.getByText('OK').closest('[data-type]')
     expect(toast).toHaveAttribute('data-type', 'success')
+    expect(toast?.className).toContain('border-l-ink-muted')
   })
 
-  it('error toast has red left border', () => {
+  it('error toast has accent left border', () => {
     act(() => {
       useToastStore.getState().addToast({ message: 'Oops', type: 'error' })
     })
     render(<ToastContainer />)
     const toast = screen.getByText('Oops').closest('[data-type]')
     expect(toast).toHaveAttribute('data-type', 'error')
+    expect(toast?.className).toContain('border-l-accent')
   })
 })
