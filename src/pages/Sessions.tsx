@@ -451,6 +451,7 @@ function SessionCard({
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([])
+  const [deviceCount, setDeviceCount] = useState<number | null>(null)
   const [query, setQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<Session | null>(null)
@@ -468,6 +469,10 @@ export default function SessionsPage() {
       .then(({ data }) => {
         if (data) setSessions(data as Session[])
       })
+    supabase
+      .from('devices')
+      .select('id', { count: 'exact', head: true })
+      .then(({ count }) => setDeviceCount(count ?? 0))
   }, [])
 
   useEffect(() => {
@@ -601,14 +606,77 @@ export default function SessionsPage() {
             </div>
           )}
 
-          {/* Empty state */}
-          {sessions.length === 0 && (
-            <p className="font-serif italic text-[14px] text-ink-soft">
-              No sessions yet.{' '}
-              <Link to="/sessions/new" className="text-accent underline">
-                Log your first jam →
-              </Link>
-            </p>
+          {/* Empty state — onboarding card */}
+          {sessions.length === 0 && deviceCount !== null && (
+            <div
+              className="rounded-[4px] p-7 flex flex-col gap-5"
+              style={{
+                background: 'var(--paper-grad)',
+                border: '1px solid rgb(var(--rule-soft))',
+                boxShadow: theme === 'dark'
+                  ? '0 4px 16px rgba(0,0,0,0.3)'
+                  : '0 4px 16px rgba(80,55,20,0.08)',
+              }}
+            >
+              <div>
+                <h2 className="font-serif font-semibold text-[22px] tracking-[-0.01em] text-ink leading-tight">
+                  Welcome to patch-pal
+                </h2>
+                <p className="font-serif italic text-[14px] text-ink-soft mt-1">
+                  Your hardware session journal. Two steps to get started.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {/* Step 1 */}
+                <div className="flex gap-4 items-start">
+                  <span
+                    className="font-mono text-[10px] tracking-[0.2em] shrink-0 mt-0.5"
+                    style={{ color: deviceCount > 0 ? 'rgb(var(--accent))' : 'rgb(var(--ink-muted))' }}
+                  >
+                    {deviceCount > 0 ? '✓ 01' : '01'}
+                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-serif font-semibold text-[15px] text-ink leading-tight">
+                      Add your gear
+                    </span>
+                    <span className="font-serif italic text-[13px] text-ink-soft">
+                      Tell patch-pal which devices you jam with — synths, drum machines, effects.
+                    </span>
+                    {deviceCount === 0 && (
+                      <Link to="/devices" className="font-mono text-[10px] tracking-[0.16em] uppercase text-accent mt-1">
+                        Go to Gear →
+                      </Link>
+                    )}
+                    {deviceCount > 0 && (
+                      <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-muted mt-1">
+                        {deviceCount} device{deviceCount !== 1 ? 's' : ''} in your roster
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ height: 1, background: 'rgb(var(--rule-soft))' }} />
+
+                {/* Step 2 */}
+                <div className="flex gap-4 items-start">
+                  <span className="font-mono text-[10px] tracking-[0.2em] text-ink-muted shrink-0 mt-0.5">
+                    02
+                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-serif font-semibold text-[15px] text-ink leading-tight">
+                      Log your first session
+                    </span>
+                    <span className="font-serif italic text-[13px] text-ink-soft">
+                      BPM, devices, signal flow — capture everything from the jam before it's gone.
+                    </span>
+                    <Link to="/sessions/new" className="font-mono text-[10px] tracking-[0.16em] uppercase text-accent mt-1">
+                      New entry →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {sessions.length > 0 && filtered.length === 0 && (
