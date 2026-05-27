@@ -76,6 +76,14 @@ function FieldInput({ label, id, children }: { label: string; id: string; childr
   )
 }
 
+function getDefaultTitle(): string {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return 'Morning Jam'
+  if (hour >= 12 && hour < 17) return 'Afternoon Jam'
+  if (hour >= 17 && hour < 21) return 'Evening Session'
+  return 'Late Night Session'
+}
+
 export default function NewSessionPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -85,7 +93,7 @@ export default function NewSessionPage() {
   const theme = useThemeStore((s) => s.theme)
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<MetaFields>({
-    defaultValues: forkState?.prefill ?? { title: '', bpm: '', key_scale: '', ableton_project: '', notes: '' },
+    defaultValues: forkState?.prefill ?? { title: getDefaultTitle(), bpm: '', key_scale: '', ableton_project: '', notes: '' },
   })
 
   const [devices, setDevices] = useState<Device[]>([])
@@ -96,6 +104,7 @@ export default function NewSessionPage() {
     forkState?.prefill?.connections ?? [],
   )
   const [tags, setTags] = useState<string[]>(forkState?.prefill?.mood_tags ?? [])
+  const [showMore, setShowMore] = useState(false)
 
   useEffect(() => {
     supabase
@@ -103,7 +112,17 @@ export default function NewSessionPage() {
       .select('*')
       .order('created_at', { ascending: true })
       .then(({ data }) => {
-        if (data) setDevices(data as Device[])
+        if (data) {
+          const devList = data as Device[]
+          setDevices(devList)
+          if (!forkState && devList.length > 0 && devList.length <= 5) {
+            setSessionDevices(
+              devList.map((d) => ({ deviceId: d.id, syncRole: 'standalone' as const, syncMode: '', patchNotes: '' })),
+            )
+            const lastDevice = devList[devList.length - 1]
+            setSessionConnections([{ fromName: lastDevice.name, toName: 'OUT', kind: 'audio', label: '' }])
+          }
+        }
       })
   }, [])
 
@@ -220,67 +239,78 @@ export default function NewSessionPage() {
             )}
           </FieldInput>
 
-          <FieldInput label="Key / Scale" id="key_scale">
-            <input
-              id="key_scale"
-              placeholder="e.g. A minor"
-              style={fieldStyle}
-              {...register('key_scale')}
-            />
-          </FieldInput>
+          {/* More options toggle */}
+          <button
+            type="button"
+            onClick={() => setShowMore((v) => !v)}
+            className="self-start font-serif italic text-[13px] text-ink-muted"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            {showMore ? '▾ fewer options' : '▸ more options'}
+          </button>
 
-          {/* Ableton project */}
-          <FieldInput label="Ableton project" id="ableton_project">
-            <input
-              id="ableton_project"
-              placeholder="Project name or path"
-              style={fieldStyle}
-              {...register('ableton_project')}
-            />
-          </FieldInput>
+          {showMore && (
+            <>
+              <FieldInput label="Key / Scale" id="key_scale">
+                <input
+                  id="key_scale"
+                  placeholder="e.g. A minor"
+                  style={fieldStyle}
+                  {...register('key_scale')}
+                />
+              </FieldInput>
 
-          {/* Mood picker */}
-          <div className="flex flex-col gap-2">
-            <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">Mood</span>
-            <div className="flex flex-wrap gap-2">
-              {MOOD_SUGGESTIONS.map((s) => {
-                const sel = tags.includes(s)
-                const bg = sel ? (MOOD_COLOR[theme][s] ?? 'rgba(244,211,94,0.85)') : 'transparent'
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => (sel ? removeTag(s) : addTag(s))}
-                    style={{
-                      fontFamily: '"JetBrains Mono", monospace',
-                      fontSize: 10,
-                      letterSpacing: '0.06em',
-                      textTransform: 'lowercase',
-                      color: 'rgb(var(--ink))',
-                      background: bg,
-                      padding: '5px 10px 4px',
-                      borderRadius: 12,
-                      border: `1px ${sel ? 'solid' : 'dashed'} rgb(var(--ink))`,
-                      cursor: 'pointer',
-                      opacity: sel ? 1 : 0.65,
-                    }}
-                  >
-                    {s}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+              <FieldInput label="Ableton project" id="ableton_project">
+                <input
+                  id="ableton_project"
+                  placeholder="Project name or path"
+                  style={fieldStyle}
+                  {...register('ableton_project')}
+                />
+              </FieldInput>
 
-          {/* Field notes */}
-          <FieldInput label="Field notes" id="notes">
-            <textarea
-              id="notes"
-              rows={3}
-              style={{ ...fieldStyle, resize: 'none' }}
-              {...register('notes')}
-            />
-          </FieldInput>
+              <div className="flex flex-col gap-2">
+                <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-muted">Mood</span>
+                <div className="flex flex-wrap gap-2">
+                  {MOOD_SUGGESTIONS.map((s) => {
+                    const sel = tags.includes(s)
+                    const bg = sel ? (MOOD_COLOR[theme][s] ?? 'rgba(244,211,94,0.85)') : 'transparent'
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => (sel ? removeTag(s) : addTag(s))}
+                        style={{
+                          fontFamily: '"JetBrains Mono", monospace',
+                          fontSize: 10,
+                          letterSpacing: '0.06em',
+                          textTransform: 'lowercase',
+                          color: 'rgb(var(--ink))',
+                          background: bg,
+                          padding: '5px 10px 4px',
+                          borderRadius: 12,
+                          border: `1px ${sel ? 'solid' : 'dashed'} rgb(var(--ink))`,
+                          cursor: 'pointer',
+                          opacity: sel ? 1 : 0.65,
+                        }}
+                      >
+                        {s}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <FieldInput label="Field notes" id="notes">
+                <textarea
+                  id="notes"
+                  rows={3}
+                  style={{ ...fieldStyle, resize: 'none' }}
+                  {...register('notes')}
+                />
+              </FieldInput>
+            </>
+          )}
 
           {/* Devices section */}
           <DevicesSection
