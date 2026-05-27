@@ -5,6 +5,7 @@ import {
   Cpu,
   type LucideIcon,
   Music2,
+  Piano,
   Scissors,
   Sliders,
   Wand2,
@@ -24,6 +25,7 @@ export type DeviceType =
   | 'drum_machine'
   | 'sampler'
   | 'effects_unit'
+  | 'midi_controller'
   | 'other'
 
 export interface Device {
@@ -42,8 +44,9 @@ export const DEVICE_TYPE_LABELS: Record<DeviceType, string> = {
   digital_synth:  'Digital synth',
   drum_machine:   'Drum machine',
   sampler:        'Sampler',
-  effects_unit:   'Effects unit',
-  other:          'Other',
+  effects_unit:    'Effects unit',
+  midi_controller: 'MIDI controller',
+  other:           'Other',
 }
 
 export const DEVICE_TYPE_BADGE: Record<DeviceType, string> = {
@@ -53,6 +56,7 @@ export const DEVICE_TYPE_BADGE: Record<DeviceType, string> = {
   drum_machine:    'bg-rose-900 text-rose-300',
   sampler:         'bg-violet-900 text-violet-300',
   effects_unit:    'bg-green-900 text-green-300',
+  midi_controller: 'bg-blue-900 text-blue-300',
   other:           'bg-zinc-800 text-zinc-400',
 }
 
@@ -63,12 +67,13 @@ export const DEVICE_ICONS: Record<DeviceType, LucideIcon> = {
   drum_machine:    Music2,
   sampler:         Scissors,
   effects_unit:    Wand2,
+  midi_controller: Piano,
   other:           Box,
 }
 
 const DEVICE_TYPES: DeviceType[] = [
   'pocket_operator', 'analog_synth', 'digital_synth', 'drum_machine',
-  'sampler', 'effects_unit', 'other',
+  'sampler', 'effects_unit', 'midi_controller', 'other',
 ]
 
 interface FormValues {
