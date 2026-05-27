@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useThemeStore } from '../store/theme'
@@ -463,6 +463,9 @@ export default function SessionsPage() {
   const addToast = useToastStore((s) => s.addToast)
   const user = useAuthStore((s) => s.user)
   const [query, setQuery] = useState('')
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set())
+  const [gearPickerOpen, setGearPickerOpen] = useState(false)
+  const gearPickerRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<Session | null>(null)
   const theme = useThemeStore((s) => s.theme)
@@ -510,13 +513,42 @@ export default function SessionsPage() {
       })
   }, [activeId])
 
-  const filtered = query
-    ? sessions.filter(
-        (s) =>
-          s.title.toLowerCase().includes(query.toLowerCase()) ||
-          (s.notes?.toLowerCase().includes(query.toLowerCase()) ?? false),
-      )
-    : sessions
+  useEffect(() => {
+    if (!gearPickerOpen) return
+    const handler = (e: MouseEvent) => {
+      if (gearPickerRef.current && !gearPickerRef.current.contains(e.target as Node)) {
+        setGearPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [gearPickerOpen])
+
+  const allSessionDevices = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const s of sessions) {
+      for (const sd of s.session_devices) {
+        seen.set(sd.devices.id, sd.devices.name)
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [sessions])
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase()
+    return sessions.filter((s) => {
+      const deviceNames = s.session_devices.map((sd) => sd.devices.name.toLowerCase())
+      const matchesQuery = !q ||
+        s.title.toLowerCase().includes(q) ||
+        (s.notes?.toLowerCase().includes(q) ?? false) ||
+        deviceNames.some((n) => n.includes(q))
+      const matchesDevices = selectedDeviceIds.size === 0 ||
+        s.session_devices.some((sd) => selectedDeviceIds.has(sd.devices.id))
+      return matchesQuery && matchesDevices
+    })
+  }, [sessions, query, selectedDeviceIds])
 
   const handleCardClick = (session: Session) => {
     if (isDesktop) {
@@ -672,6 +704,138 @@ export default function SessionsPage() {
               width: '100%',
             }}
           />
+
+          {/* Gear filter */}
+          {allSessionDevices.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[...selectedDeviceIds].map((id) => {
+                const name = allSessionDevices.find((d) => d.id === id)?.name
+                if (!name) return null
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedDeviceIds((prev) => { const next = new Set(prev); next.delete(id); return next })}
+                    style={{
+                      fontFamily: '"JetBrains Mono", monospace',
+                      fontSize: 9,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      color: 'rgb(var(--ink))',
+                      background: 'rgb(var(--card-active))',
+                      border: '1px solid rgb(var(--ink))',
+                      borderRadius: 2,
+                      padding: '3px 7px 2px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    {name}
+                    <span style={{ opacity: 0.5, fontSize: 11, lineHeight: 1 }}>×</span>
+                  </button>
+                )
+              })}
+
+              <div ref={gearPickerRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setGearPickerOpen((v) => !v)}
+                  style={{
+                    fontFamily: '"JetBrains Mono", monospace',
+                    fontSize: 9,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'rgb(var(--ink-muted))',
+                    background: 'transparent',
+                    border: '1px dashed rgb(var(--rule))',
+                    borderRadius: 2,
+                    padding: '3px 7px 2px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ＋ gear
+                </button>
+
+                {gearPickerOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      zIndex: 50,
+                      background: 'var(--paper-grad)',
+                      border: '1px solid rgb(var(--ink))',
+                      borderRadius: 2,
+                      boxShadow: '3px 3px 0 rgb(var(--accent))',
+                      minWidth: 180,
+                      maxHeight: 220,
+                      overflowY: 'auto',
+                      padding: '4px 0',
+                    }}
+                  >
+                    {allSessionDevices.map((d) => {
+                      const selected = selectedDeviceIds.has(d.id)
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDeviceIds((prev) => {
+                              const next = new Set(prev)
+                              selected ? next.delete(d.id) : next.add(d.id)
+                              return next
+                            })
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            width: '100%',
+                            padding: '6px 12px',
+                            background: selected ? 'rgb(var(--card-active))' : 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontFamily: '"JetBrains Mono", monospace',
+                            fontSize: 10,
+                            letterSpacing: '0.1em',
+                            color: 'rgb(var(--ink))',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <span style={{ width: 10, flexShrink: 0, color: 'rgb(var(--accent))' }}>
+                            {selected ? '✓' : ''}
+                          </span>
+                          {d.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {selectedDeviceIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDeviceIds(new Set())}
+                  style={{
+                    fontFamily: '"Spectral", serif',
+                    fontStyle: 'italic',
+                    fontSize: 12,
+                    color: 'rgb(var(--ink-muted))',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline',
+                  }}
+                >
+                  clear
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Loading / fetch error */}
           {loading && (
