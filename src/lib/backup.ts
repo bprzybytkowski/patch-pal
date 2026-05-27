@@ -78,7 +78,13 @@ export interface ImportResult {
   sessionsAdded: number
 }
 
+const MAX_BACKUP_SIZE = 5 * 1024 * 1024 // 5 MB
+
 export async function importBackup(file: File, userId: string): Promise<ImportResult> {
+  if (file.size > MAX_BACKUP_SIZE) {
+    throw new Error('Backup file is too large (max 5 MB).')
+  }
+
   const text = await file.text()
   const backup = JSON.parse(text) as BackupFile
 

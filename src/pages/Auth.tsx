@@ -58,17 +58,15 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setServerError(error.message); return }
       setUser(data.user)
-      posthog.identify(data.user.id, { email: data.user.email })
+      posthog.identify(data.user.id)
       posthog.capture('user_signed_in')
       navigate('/sessions')
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setServerError(error.message); return }
-      if (data.user?.identities?.length === 0) {
-        setServerError('An account with this email already exists.')
-        return
+      if (data.user && data.user.identities && data.user.identities.length > 0) {
+        posthog.capture('user_signed_up')
       }
-      posthog.capture('user_signed_up', { email })
       setSentEmail(email)
       setView('signed-up')
     }
