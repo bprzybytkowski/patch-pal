@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import * as photos from '../lib/photos'
+import { useSortable } from '@dnd-kit/sortable'
 import SessionDetailPage from './SessionDetail'
 
 vi.mock('../lib/supabase', () => ({ supabase: { from: vi.fn() } }))
@@ -13,6 +14,19 @@ vi.mock('../lib/photos', () => ({
 vi.mock('../store/auth', () => ({
   useAuthStore: (sel: (s: { user: { id: string } }) => unknown) => sel({ user: { id: 'user-1' } }),
 }))
+vi.mock('@dnd-kit/sortable', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@dnd-kit/sortable')>()
+  return {
+    ...actual,
+    useSortable: vi.fn().mockReturnValue({
+      attributes: {},
+      listeners: {},
+      setNodeRef: () => {},
+      transform: null,
+      transition: undefined,
+    }),
+  }
+})
 
 const mockUploadDevicePhoto = vi.mocked(photos.uploadDevicePhoto)
 
@@ -270,6 +284,51 @@ describe('Session detail', () => {
       await userEvent.click(cancelBtn)
       expect(screen.queryByRole('button', { name: /gallery/i })).not.toBeInTheDocument()
       expect(mockUploadDevicePhoto).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('device card drag transform', () => {
+    const scalingTransform = {
+      attributes: {} as never,
+      listeners: {} as never,
+      setNodeRef: () => {},
+      transform: { x: 0, y: 20, scaleX: 1.1, scaleY: 0.9 },
+      transition: 'transform 250ms ease',
+    } as unknown as ReturnType<typeof useSortable>
+
+    const nullTransform = {
+      attributes: {},
+      listeners: {},
+      setNodeRef: () => {},
+      transform: null,
+      transition: undefined,
+    } as unknown as ReturnType<typeof useSortable>
+
+    beforeEach(() => {
+      vi.mocked(useSortable).mockReturnValue(scalingTransform)
+    })
+
+    afterEach(() => {
+      vi.mocked(useSortable).mockReturnValue(nullTransform)
+    })
+
+    it('applies translate-only transform (no scale distortion during drag)', async () => {
+      const session = makeSession({
+        session_devices: [
+          { id: 'sd-1', device_id: 'dev-1', sync_role: 'standalone', sync_mode: null, patch_notes: null, sort_order: 0, devices: PO },
+        ],
+      })
+      mockFrom
+        .mockReturnValueOnce(makeSessionFetch(session) as never)
+        .mockReturnValueOnce(makeConnectionsFetch() as never)
+      renderDetail()
+      await userEvent.click(await screen.findByRole('button', { name: /edit/i }))
+
+      // The sortable card div should apply only translate, not scale
+      await screen.findByText('PO-33')
+      const card = document.querySelector<HTMLElement>('[style*="translate3d"]')
+      expect(card).not.toBeNull()
+      expect(card!.style.transform).not.toMatch(/scale/i)
     })
   })
 })

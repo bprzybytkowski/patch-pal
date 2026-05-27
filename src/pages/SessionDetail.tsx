@@ -999,7 +999,7 @@ function EditDeviceCard({
       ref={setNodeRef}
       className="relative flex flex-col gap-3 p-3 rounded-[2px]"
       style={{
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition: transition ?? undefined,
         background: 'rgba(0,0,0,0.03)',
         border: connectionMode === 'armed'
