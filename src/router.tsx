@@ -8,6 +8,7 @@ import SessionsPage from './pages/Sessions'
 import NewSessionPage from './pages/NewSession'
 import SessionDetailPage from './pages/SessionDetail'
 import DevicesPage from './pages/Devices'
+import QuickCapturePage from './pages/QuickCapture'
 
 export const routes = [
   { path: '/', element: <RootRedirect /> },
@@ -21,6 +22,7 @@ export const routes = [
         children: [
           { path: '/sessions', element: <SessionsPage /> },
           { path: '/sessions/new', element: <NewSessionPage /> },
+          { path: '/sessions/quick', element: <QuickCapturePage /> },
           { path: '/sessions/:id', element: <SessionDetailPage /> },
           { path: '/devices', element: <DevicesPage /> },
         ],

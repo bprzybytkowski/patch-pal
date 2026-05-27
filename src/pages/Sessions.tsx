@@ -616,6 +616,24 @@ export default function SessionsPage() {
             </div>
             <div className="flex items-center gap-2">
               <Link
+                to="/sessions/quick"
+                style={{
+                  fontFamily: '"JetBrains Mono", monospace',
+                  fontSize: 10,
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  background: 'transparent',
+                  color: 'rgb(var(--ink-muted))',
+                  padding: '8px 12px 7px',
+                  borderRadius: 2,
+                  border: '1px dashed rgb(var(--rule))',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                }}
+              >
+                ⚡ quick
+              </Link>
+              <Link
                 to="/sessions/new"
                 style={{
                   fontFamily: '"JetBrains Mono", monospace',
@@ -835,7 +853,7 @@ export default function SessionsPage() {
       {/* FAB */}
       {isPhone && (
         <Link
-          to="/sessions/new"
+          to="/sessions/quick"
           className="fixed bottom-[72px] right-5 z-40 flex items-center justify-center"
           style={{
             width: 56,
