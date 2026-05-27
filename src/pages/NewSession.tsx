@@ -14,6 +14,7 @@ import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type CableKind } from '../components/SignalFlow'
 import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
 import { useConnectionDrawing } from '../lib/hooks'
+import { uploadDevicePhoto, deleteDevicePhoto } from '../lib/photos'
 
 const CABLE_KIND_COLORS: Record<CableKind, string> = {
   audio: '#c13b2a',
@@ -51,6 +52,7 @@ interface SessionDevice {
   syncRole: 'master' | 'slave' | 'standalone'
   syncMode: string
   patchNotes: string
+  photoUrl?: string
 }
 
 const fieldStyle: React.CSSProperties = {
@@ -209,6 +211,7 @@ export default function NewSessionPage() {
             sync_role: sd.syncRole,
             sync_mode: sd.syncMode || null,
             patch_notes: sd.patchNotes || null,
+            photo_url: sd.photoUrl || null,
             sort_order: i,
           })),
         )
@@ -376,6 +379,7 @@ export default function NewSessionPage() {
 
           {/* Devices section */}
           <DevicesSection
+            userId={user!.id}
             devices={devices}
             sessionDevices={sessionDevices}
             connections={sessionConnections}
@@ -546,6 +550,7 @@ export default function NewSessionPage() {
 const SYNC_ROLES = ['master', 'slave', 'standalone'] as const
 
 function DevicesSection({
+  userId,
   devices,
   sessionDevices,
   connections,
@@ -557,6 +562,7 @@ function DevicesSection({
   onAddConnection,
   onRemoveConnection,
 }: {
+  userId: string
   devices: Device[]
   sessionDevices: SessionDevice[]
   connections: SessionConnection[]
@@ -616,6 +622,7 @@ function DevicesSection({
             return (
               <DeviceCard
                 key={sd.deviceId}
+                userId={userId}
                 device={device}
                 sessionDevice={sd}
                 onChange={(patch) => onChange(idx, patch)}
@@ -824,6 +831,7 @@ function GripDots() {
 }
 
 function DeviceCard({
+  userId,
   device,
   sessionDevice,
   onChange,
@@ -833,6 +841,7 @@ function DeviceCard({
   onArm,
   onConnect,
 }: {
+  userId: string
   device: Device
   sessionDevice: SessionDevice
   onChange: (patch: Partial<SessionDevice>) => void
@@ -843,6 +852,29 @@ function DeviceCard({
   onConnect: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: sessionDevice.deviceId })
+  const addToast = useToastStore((s) => s.addToast)
+  const [uploading, setUploading] = useState(false)
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadDevicePhoto(file, userId)
+      onChange({ photoUrl: url })
+    } catch (err) {
+      addToast({ message: err instanceof Error ? err.message : 'Upload failed.', type: 'error' })
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleRemovePhoto = async () => {
+    if (!sessionDevice.photoUrl) return
+    onChange({ photoUrl: undefined })
+    await deleteDevicePhoto(sessionDevice.photoUrl)
+  }
 
   return (
     <div
@@ -978,6 +1010,32 @@ function DeviceCard({
         value={sessionDevice.patchNotes}
         onChange={(e) => onChange({ patchNotes: e.target.value })}
       />
+
+      {/* Photo */}
+      {sessionDevice.photoUrl ? (
+        <div style={{ position: 'relative' }}>
+          <img
+            src={sessionDevice.photoUrl}
+            alt="patch photo"
+            style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 2, border: '1px dashed rgb(var(--rule))', display: 'block' }}
+          />
+          <button
+            type="button"
+            aria-label="Remove photo"
+            onClick={handleRemovePhoto}
+            style={{ position: 'absolute', top: 4, right: 4, background: 'rgb(var(--paper))', border: '1px solid rgb(var(--rule))', borderRadius: 2, width: 22, height: 22, display: 'grid', placeItems: 'center', cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: 'rgb(var(--ink-muted))' }}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <label style={{ display: 'block', cursor: uploading ? 'default' : 'pointer' }}>
+          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={handlePhotoChange} />
+          <span style={{ display: 'block', textAlign: 'center', padding: '5px 10px', border: '1px dashed rgb(var(--rule))', borderRadius: 2, fontFamily: '"JetBrains Mono", monospace', fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgb(var(--ink-muted))', opacity: uploading ? 0.5 : 1 }}>
+            {uploading ? 'uploading…' : '⊕ photo'}
+          </span>
+        </label>
+      )}
 
       {/* Connection strip */}
       <button

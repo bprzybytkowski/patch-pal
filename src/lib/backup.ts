@@ -20,6 +20,7 @@ interface BackupSessionDevice {
   sync_role: string
   sync_mode: string | null
   patch_notes: string | null
+  photo_url: string | null
   sort_order: number
 }
 
@@ -51,7 +52,7 @@ export async function exportBackup(): Promise<void> {
     supabase.from('devices').select('id, name, type, manufacturer, notes').order('created_at'),
     supabase
       .from('sessions')
-      .select('*, session_devices(device_id, sync_role, sync_mode, patch_notes, sort_order), session_connections(from_name, to_name, kind, label, sort_order)')
+      .select('*, session_devices(device_id, sync_role, sync_mode, patch_notes, photo_url, sort_order), session_connections(from_name, to_name, kind, label, sort_order)')
       .order('created_at'),
   ])
 
@@ -153,6 +154,7 @@ export async function importBackup(file: File, userId: string): Promise<ImportRe
           sync_role: sd.sync_role,
           sync_mode: sd.sync_mode,
           patch_notes: sd.patch_notes,
+          photo_url: sd.photo_url ?? null,
           sort_order: sd.sort_order ?? i,
         })),
       )

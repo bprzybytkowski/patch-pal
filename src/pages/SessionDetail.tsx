@@ -9,6 +9,7 @@ import { DEVICE_TYPE_LABELS, type Device, type DeviceType } from './Devices'
 import { usePostHog } from '@posthog/react'
 import { useThemeStore } from '../store/theme'
 import { useMediaQuery, useConnectionDrawing } from '../lib/hooks'
+import { uploadDevicePhoto, deleteDevicePhoto } from '../lib/photos'
 import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
@@ -47,6 +48,7 @@ interface SessionDeviceRow {
   sync_role: string
   sync_mode: string | null
   patch_notes: string | null
+  photo_url: string | null
   sort_order: number
   devices: { id: string; name: string; type: DeviceType }
 }
@@ -79,6 +81,7 @@ interface EditDevice {
   syncRole: string
   syncMode: string
   patchNotes: string
+  photoUrl?: string
   device: { id: string; name: string; type: DeviceType }
 }
 
@@ -273,6 +276,7 @@ export default function SessionDetailPage() {
         syncRole: sd.sync_role,
         syncMode: sd.sync_mode ?? '',
         patchNotes: sd.patch_notes ?? '',
+        photoUrl: sd.photo_url ?? undefined,
         device: sd.devices,
       })),
     )
@@ -333,6 +337,7 @@ export default function SessionDetailPage() {
           sync_role: ed.syncRole,
           sync_mode: ed.syncMode || null,
           patch_notes: ed.patchNotes || null,
+          photo_url: ed.photoUrl || null,
           sort_order: i,
         })),
       )
@@ -351,6 +356,7 @@ export default function SessionDetailPage() {
               sync_role: ed.syncRole,
               sync_mode: ed.syncMode || null,
               patch_notes: ed.patchNotes || null,
+              photo_url: ed.photoUrl || null,
               sort_order: i,
               devices: ed.device,
             })),
@@ -396,6 +402,7 @@ export default function SessionDetailPage() {
           sync_role: ed.syncRole,
           sync_mode: ed.syncMode || null,
           patch_notes: ed.patchNotes || null,
+          photo_url: ed.photoUrl || null,
           sort_order: i,
         })),
       )
@@ -636,6 +643,7 @@ export default function SessionDetailPage() {
             </div>
 
             <EditDevicesSection
+              userId={user!.id}
               allDevices={allDevices}
               editDevices={editDevices}
               connections={editConnections}
@@ -834,6 +842,13 @@ export default function SessionDetailPage() {
                           "{sd.patch_notes}"
                         </div>
                       )}
+                      {sd.photo_url && (
+                        <img
+                          src={sd.photo_url}
+                          alt="patch photo"
+                          style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 2, border: '1px dashed rgb(var(--rule))', display: 'block', marginTop: 8 }}
+                        />
+                      )}
                     </div>
                     <RoleStamp role={sd.sync_role} theme={theme} />
                   </div>
@@ -909,6 +924,7 @@ function GripDots() {
 }
 
 function EditDeviceCard({
+  userId,
   editDevice,
   onChange,
   onRemove,
@@ -917,6 +933,7 @@ function EditDeviceCard({
   onArm,
   onConnect,
 }: {
+  userId: string
   editDevice: EditDevice
   onChange: (patch: Partial<Omit<EditDevice, 'deviceId' | 'device'>>) => void
   onRemove: () => void
@@ -926,6 +943,29 @@ function EditDeviceCard({
   onConnect: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: editDevice.deviceId })
+  const addToast = useToastStore((s) => s.addToast)
+  const [uploading, setUploading] = useState(false)
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadDevicePhoto(file, userId)
+      onChange({ photoUrl: url })
+    } catch (err) {
+      addToast({ message: err instanceof Error ? err.message : 'Upload failed.', type: 'error' })
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleRemovePhoto = async () => {
+    if (!editDevice.photoUrl) return
+    onChange({ photoUrl: undefined })
+    await deleteDevicePhoto(editDevice.photoUrl)
+  }
 
   return (
     <div
@@ -1053,6 +1093,32 @@ function EditDeviceCard({
         onChange={(e) => onChange({ patchNotes: e.target.value })}
       />
 
+      {/* Photo */}
+      {editDevice.photoUrl ? (
+        <div style={{ position: 'relative' }}>
+          <img
+            src={editDevice.photoUrl}
+            alt="patch photo"
+            style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 2, border: '1px dashed rgb(var(--rule))', display: 'block' }}
+          />
+          <button
+            type="button"
+            aria-label="Remove photo"
+            onClick={handleRemovePhoto}
+            style={{ position: 'absolute', top: 4, right: 4, background: 'rgb(var(--paper))', border: '1px solid rgb(var(--rule))', borderRadius: 2, width: 22, height: 22, display: 'grid', placeItems: 'center', cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: 'rgb(var(--ink-muted))' }}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <label style={{ display: 'block', cursor: uploading ? 'default' : 'pointer' }}>
+          <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={handlePhotoChange} />
+          <span style={{ display: 'block', textAlign: 'center', padding: '5px 10px', border: '1px dashed rgb(var(--rule))', borderRadius: 2, fontFamily: '"JetBrains Mono", monospace', fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgb(var(--ink-muted))', opacity: uploading ? 0.5 : 1 }}>
+            {uploading ? 'uploading…' : '⊕ photo'}
+          </span>
+        </label>
+      )}
+
       {/* Connection strip */}
       <button
         type="button"
@@ -1088,6 +1154,7 @@ function EditDeviceCard({
 }
 
 function EditDevicesSection({
+  userId,
   allDevices,
   editDevices,
   connections,
@@ -1099,6 +1166,7 @@ function EditDevicesSection({
   onAddConnection,
   onRemoveConnection,
 }: {
+  userId: string
   allDevices: Device[]
   editDevices: EditDevice[]
   connections: { fromName: string; toName: string; kind: CableKind; label: string }[]
@@ -1154,6 +1222,7 @@ function EditDevicesSection({
             return (
               <EditDeviceCard
                 key={ed.deviceId}
+                userId={userId}
                 editDevice={ed}
                 onChange={(patch) => onChange(idx, patch)}
                 onRemove={() => onRemove(idx)}
