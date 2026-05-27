@@ -326,6 +326,7 @@ export default function DevicesPage() {
   const posthog = usePostHog()
   const theme = useThemeStore((s) => s.theme)
   const [devices, setDevices] = useState<Device[]>([])
+  const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -343,8 +344,8 @@ export default function DevicesPage() {
       .select('*')
       .order('created_at', { ascending: true })
       .then(({ data, error }) => {
-        if (error) { setFetchError(true); return }
-        if (data) setDevices(data as Device[])
+        if (error) { setFetchError(true) } else if (data) { setDevices(data as Device[]) }
+        setLoading(false)
       })
   }, [])
 
@@ -554,12 +555,15 @@ export default function DevicesPage() {
       </div>
 
       <div className="flex flex-col gap-4">
-        {fetchError && (
+        {loading && (
+          <p className="font-serif italic text-[14px] text-ink-muted">Loading…</p>
+        )}
+        {!loading && fetchError && (
           <p className="font-serif italic text-[14px] text-accent">
             Could not load devices. Check your connection and refresh.
           </p>
         )}
-        {!fetchError && devices.length === 0 && (
+        {!loading && !fetchError && devices.length === 0 && (
           <p className="font-serif italic text-[14px] text-ink-muted">No devices yet.</p>
         )}
         {devices.map((device, i) =>

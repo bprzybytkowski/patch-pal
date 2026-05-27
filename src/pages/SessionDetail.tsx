@@ -194,6 +194,7 @@ export default function SessionDetailPage() {
   const user = useAuthStore((s) => s.user)
 
   const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(false)
   const [nextTakeId, setNextTakeId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
@@ -221,7 +222,7 @@ export default function SessionDetailPage() {
       .eq('id', id)
       .single()
       .then(async ({ data, error }) => {
-        if (error || !data) { setFetchError(true); return }
+        if (error || !data) { setFetchError(true); setLoading(false); return }
         const { data: connData } = await supabase
           .from('session_connections')
           .select('*')
@@ -236,6 +237,7 @@ export default function SessionDetailPage() {
         setSession(s)
         setTags(s.mood_tags)
         setNextTakeId(null)
+        setLoading(false)
         supabase
           .from('sessions')
           .select('id')
@@ -416,6 +418,12 @@ export default function SessionDetailPage() {
     posthog.capture('session_deleted', { session_id: id })
     navigate('/sessions')
   }
+
+  if (loading) return (
+    <div className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">
+      <p className="font-serif italic text-[14px] text-ink-muted">Loading…</p>
+    </div>
+  )
 
   if (fetchError) return (
     <div className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">

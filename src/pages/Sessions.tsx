@@ -453,6 +453,7 @@ function SessionCard({
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([])
+  const [loading, setLoading] = useState(true)
   const [deviceCount, setDeviceCount] = useState<number | null>(null)
   const [fetchError, setFetchError] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -472,8 +473,8 @@ export default function SessionsPage() {
       .select('*, session_devices(*, devices(*))')
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
-        if (error) { setFetchError(true); return }
-        if (data) setSessions(data as Session[])
+        if (error) { setFetchError(true) } else if (data) { setSessions(data as Session[]) }
+        setLoading(false)
       })
     supabase
       .from('devices')
@@ -614,22 +615,25 @@ export default function SessionsPage() {
             }}
           />
 
-          {/* Fetch error */}
-          {fetchError && (
+          {/* Loading / fetch error */}
+          {loading && (
+            <p className="font-serif italic text-[14px] text-ink-muted">Loading…</p>
+          )}
+          {!loading && fetchError && (
             <p className="font-serif italic text-[14px] text-accent">
               Could not load sessions. Check your connection and refresh.
             </p>
           )}
 
           {/* Section label */}
-          {sessions.length > 0 && (
+          {!loading && sessions.length > 0 && (
             <div className="font-mono text-[10px] tracking-[0.24em] uppercase text-ink-muted -mb-1">
               This week · {filtered.length} entries
             </div>
           )}
 
           {/* Empty state — onboarding card */}
-          {sessions.length === 0 && deviceCount !== null && (
+          {!loading && !fetchError && sessions.length === 0 && deviceCount !== null && (
             <div
               className="rounded-[4px] p-7 flex flex-col gap-5"
               style={{
