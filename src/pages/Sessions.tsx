@@ -6,6 +6,7 @@ import { useMediaQuery } from '../lib/hooks'
 import { MOOD_COLOR } from '../lib/moodColors'
 import { usePostHog } from '@posthog/react'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { DEVICE_TYPE_LABELS, type DeviceType } from './Devices'
 
 interface SessionDeviceRow {
@@ -452,6 +453,7 @@ function SessionCard({
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [deviceCount, setDeviceCount] = useState<number | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [query, setQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<Session | null>(null)
@@ -517,13 +519,13 @@ export default function SessionsPage() {
 
   const handleDelete = async () => {
     if (!activeSession) return
-    if (!window.confirm('Burn this page?')) return
     posthog.capture('session_deleted', { session_id: activeSession.id })
     await supabase.from('sessions').delete().eq('id', activeSession.id)
     setSessions((prev) => prev.filter((s) => s.id !== activeSession.id))
     const remaining = sessions.filter((s) => s.id !== activeSession.id)
     setActiveId(remaining[0]?.id ?? null)
     setActiveSession(null)
+    setConfirmingDelete(false)
   }
 
   const handleEdit = () => {
@@ -532,6 +534,14 @@ export default function SessionsPage() {
 
   return (
     <div className="relative z-10">
+      {confirmingDelete && (
+        <ConfirmModal
+          message="Burn this page? This session will be permanently deleted."
+          confirmLabel="Burn it"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
       {/* Two-column on desktop */}
       <div className="lg:grid" style={{ gridTemplateColumns: '1fr 640px' }}>
 
@@ -715,7 +725,7 @@ export default function SessionsPage() {
               <SessionDetailPanel
                 session={activeSession}
                 theme={theme}
-                onDelete={handleDelete}
+                onDelete={() => setConfirmingDelete(true)}
                 onEdit={handleEdit}
                 onPrevTake={
                   activeSession.forked_from

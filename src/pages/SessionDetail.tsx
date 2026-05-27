@@ -13,6 +13,7 @@ import { MOOD_COLOR } from '../lib/moodColors'
 import SignalFlow, { type SignalFlowDevice, type SignalFlowConnection } from '../components/SignalFlow'
 import { ConnectionTypeSheet } from '../components/ConnectionTypeSheet'
 import { useAuthStore } from '../store/auth'
+import { ConfirmModal } from '../components/ConfirmModal'
 
 const CABLE_KIND_COLORS: Record<CableKind, string> = {
   audio: '#c13b2a',
@@ -194,6 +195,7 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<Session | null>(null)
   const [nextTakeId, setNextTakeId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [editConnections, setEditConnections] = useState<{ fromName: string; toName: string; kind: CableKind; label: string }[]>([])
@@ -399,7 +401,6 @@ export default function SessionDetailPage() {
   })
 
   const handleDelete = async () => {
-    if (!window.confirm('Burn this page?')) return
     posthog.capture('session_deleted', { session_id: id })
     await supabase.from('sessions').delete().eq('id', id)
     navigate('/sessions')
@@ -422,6 +423,14 @@ export default function SessionDetailPage() {
 
   return (
     <div className="relative z-10 p-5 sm:p-8 max-w-2xl mx-auto">
+      {confirmingDelete && (
+        <ConfirmModal
+          message="Burn this page? This session will be permanently deleted."
+          confirmLabel="Burn it"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
       {/* Cream paper card */}
       <div
         className="rounded-[4px] p-[28px_30px_28px] sm:p-[36px_38px_32px] overflow-hidden relative"
@@ -842,7 +851,7 @@ export default function SessionDetailPage() {
               </button>
               <div className="flex-1" />
               <button
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 className="font-serif italic text-[14px] text-accent underline"
                 style={{ background: 'none', border: 'none', cursor: 'pointer' }}
               >
